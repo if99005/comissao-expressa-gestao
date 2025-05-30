@@ -6,7 +6,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -54,7 +53,7 @@ const CommissionManagement = () => {
     }
   ]);
 
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isCreating, setIsCreating] = useState(false);
   const [editingCommission, setEditingCommission] = useState<Commission | null>(null);
   const [formData, setFormData] = useState({
     proposalId: "",
@@ -90,6 +89,7 @@ const CommissionManagement = () => {
     });
     setSelectedDate(undefined);
     setEditingCommission(null);
+    setIsCreating(false);
   };
 
   const handleInputChange = (field: string, value: string) => {
@@ -141,7 +141,6 @@ const CommissionManagement = () => {
       toast.success("Comissão criada com sucesso!");
     }
 
-    setIsDialogOpen(false);
     resetForm();
   };
 
@@ -154,7 +153,7 @@ const CommissionManagement = () => {
       paymentDate: "",
       notes: commission.notes || ""
     });
-    setIsDialogOpen(true);
+    setIsCreating(true);
   };
 
   const processPayment = () => {
@@ -191,7 +190,6 @@ const CommissionManagement = () => {
     setCommissions(prev => prev.map(c => c.id === editingCommission.id ? updatedCommission : c));
     toast.success("Pagamento registado com sucesso!");
     
-    setIsDialogOpen(false);
     resetForm();
   };
 
@@ -265,134 +263,130 @@ const CommissionManagement = () => {
                 Controlar pagamentos de comissões por proposta
               </CardDescription>
             </div>
-            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-              <DialogTrigger asChild>
-                <Button onClick={resetForm} className="bg-purple-600 hover:bg-purple-700">
-                  <Plus className="w-4 h-4 mr-2" />
-                  Nova Comissão
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="max-w-md">
-                <DialogHeader>
-                  <DialogTitle>
-                    {editingCommission ? "Registar Pagamento" : "Nova Comissão"}
-                  </DialogTitle>
-                  <DialogDescription>
-                    {editingCommission ? "Registar pagamento de comissão" : "Criar nova comissão para proposta ganha"}
-                  </DialogDescription>
-                </DialogHeader>
-                <div className="space-y-4 mt-4">
-                  {!editingCommission && (
-                    <>
-                      <div>
-                        <Label htmlFor="proposalId">Proposta Ganha *</Label>
-                        <Select value={formData.proposalId} onValueChange={(value) => handleInputChange("proposalId", value)}>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Selecionar proposta" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {wonProposals.map(proposal => (
-                              <SelectItem key={proposal.id} value={proposal.id}>
-                                {proposal.client} - €{proposal.totalCommission.toFixed(2)}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div>
-                        <Label htmlFor="commercial">Comercial *</Label>
-                        <Select value={formData.commercial} onValueChange={(value) => handleInputChange("commercial", value)}>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Selecionar comercial" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {commercials.map(commercial => (
-                              <SelectItem key={commercial} value={commercial}>
-                                {commercial}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </>
-                  )}
-
-                  {editingCommission && (
-                    <>
-                      <div className="bg-gray-50 p-3 rounded-lg">
-                        <div className="text-sm text-gray-600">Comissão: {editingCommission.proposalClient}</div>
-                        <div className="text-sm text-gray-600">Comercial: {editingCommission.commercial}</div>
-                        <div className="text-sm font-semibold">Total: €{editingCommission.totalValue.toFixed(2)}</div>
-                        <div className="text-sm text-green-600">Pago: €{editingCommission.paidValue.toFixed(2)}</div>
-                        <div className="text-sm text-red-600">Pendente: €{editingCommission.pendingValue.toFixed(2)}</div>
-                      </div>
-                      <div>
-                        <Label htmlFor="paymentAmount">Valor do Pagamento *</Label>
-                        <Input
-                          id="paymentAmount"
-                          type="number"
-                          step="0.01"
-                          max={editingCommission.pendingValue}
-                          value={formData.paymentAmount}
-                          onChange={(e) => handleInputChange("paymentAmount", e.target.value)}
-                          placeholder="0.00"
-                        />
-                      </div>
-                      <div>
-                        <Label>Data do Pagamento *</Label>
-                        <Popover>
-                          <PopoverTrigger asChild>
-                            <Button
-                              variant="outline"
-                              className={cn(
-                                "w-full justify-start text-left font-normal",
-                                !selectedDate && "text-muted-foreground"
-                              )}
-                            >
-                              <CalendarIcon className="mr-2 h-4 w-4" />
-                              {selectedDate ? format(selectedDate, "PPP", { locale: pt }) : "Selecionar data"}
-                            </Button>
-                          </PopoverTrigger>
-                          <PopoverContent className="w-auto p-0" align="start">
-                            <Calendar
-                              mode="single"
-                              selected={selectedDate}
-                              onSelect={handleDateSelect}
-                              initialFocus
-                              className="pointer-events-auto"
-                            />
-                          </PopoverContent>
-                        </Popover>
-                      </div>
-                    </>
-                  )}
-
-                  <div>
-                    <Label htmlFor="notes">Notas</Label>
-                    <Input
-                      id="notes"
-                      value={formData.notes}
-                      onChange={(e) => handleInputChange("notes", e.target.value)}
-                      placeholder="Observações sobre o pagamento"
-                    />
-                  </div>
-                </div>
-                <div className="flex justify-end gap-2 mt-6">
-                  <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
-                    Cancelar
-                  </Button>
-                  <Button 
-                    onClick={editingCommission ? processPayment : handleSubmit} 
-                    className="bg-purple-600 hover:bg-purple-700"
-                  >
-                    {editingCommission ? "Registar Pagamento" : "Criar"}
-                  </Button>
-                </div>
-              </DialogContent>
-            </Dialog>
+            {!isCreating && (
+              <Button onClick={() => setIsCreating(true)} className="bg-purple-600 hover:bg-purple-700">
+                <Plus className="w-4 h-4 mr-2" />
+                Nova Comissão
+              </Button>
+            )}
           </div>
         </CardHeader>
         <CardContent>
+          {isCreating && (
+            <div className="mb-6 p-4 border rounded-lg bg-gray-50">
+              <h3 className="text-lg font-semibold mb-4">
+                {editingCommission ? "Registar Pagamento" : "Nova Comissão"}
+              </h3>
+              <div className="space-y-4">
+                {!editingCommission && (
+                  <>
+                    <div>
+                      <Label htmlFor="proposalId">Proposta Ganha *</Label>
+                      <Select value={formData.proposalId} onValueChange={(value) => handleInputChange("proposalId", value)}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecionar proposta" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {wonProposals.map(proposal => (
+                            <SelectItem key={proposal.id} value={proposal.id}>
+                              {proposal.client} - €{proposal.totalCommission.toFixed(2)}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label htmlFor="commercial">Comercial *</Label>
+                      <Select value={formData.commercial} onValueChange={(value) => handleInputChange("commercial", value)}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecionar comercial" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {commercials.map(commercial => (
+                            <SelectItem key={commercial} value={commercial}>
+                              {commercial}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </>
+                )}
+
+                {editingCommission && (
+                  <>
+                    <div className="bg-white p-3 rounded border">
+                      <div className="text-sm text-gray-600">Comissão: {editingCommission.proposalClient}</div>
+                      <div className="text-sm text-gray-600">Comercial: {editingCommission.commercial}</div>
+                      <div className="text-sm font-semibold">Total: €{editingCommission.totalValue.toFixed(2)}</div>
+                      <div className="text-sm text-green-600">Pago: €{editingCommission.paidValue.toFixed(2)}</div>
+                      <div className="text-sm text-red-600">Pendente: €{editingCommission.pendingValue.toFixed(2)}</div>
+                    </div>
+                    <div>
+                      <Label htmlFor="paymentAmount">Valor do Pagamento *</Label>
+                      <Input
+                        id="paymentAmount"
+                        type="number"
+                        step="0.01"
+                        max={editingCommission.pendingValue}
+                        value={formData.paymentAmount}
+                        onChange={(e) => handleInputChange("paymentAmount", e.target.value)}
+                        placeholder="0.00"
+                      />
+                    </div>
+                    <div>
+                      <Label>Data do Pagamento *</Label>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <Button
+                            variant="outline"
+                            className={cn(
+                              "w-full justify-start text-left font-normal",
+                              !selectedDate && "text-muted-foreground"
+                            )}
+                          >
+                            <CalendarIcon className="mr-2 h-4 w-4" />
+                            {selectedDate ? format(selectedDate, "PPP", { locale: pt }) : "Selecionar data"}
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="start">
+                          <Calendar
+                            mode="single"
+                            selected={selectedDate}
+                            onSelect={handleDateSelect}
+                            initialFocus
+                            className="pointer-events-auto"
+                          />
+                        </PopoverContent>
+                      </Popover>
+                    </div>
+                  </>
+                )}
+
+                <div>
+                  <Label htmlFor="notes">Notas</Label>
+                  <Input
+                    id="notes"
+                    value={formData.notes}
+                    onChange={(e) => handleInputChange("notes", e.target.value)}
+                    placeholder="Observações sobre o pagamento"
+                  />
+                </div>
+              </div>
+              <div className="flex justify-end gap-2 mt-4">
+                <Button variant="outline" onClick={resetForm}>
+                  Cancelar
+                </Button>
+                <Button 
+                  onClick={editingCommission ? processPayment : handleSubmit} 
+                  className="bg-purple-600 hover:bg-purple-700"
+                >
+                  {editingCommission ? "Registar Pagamento" : "Criar"}
+                </Button>
+              </div>
+            </div>
+          )}
+
           <Table>
             <TableHeader>
               <TableRow>

@@ -4,7 +4,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Plus, Edit, Trash2, Users, Phone, Mail } from "lucide-react";
 import { toast } from "sonner";
@@ -47,7 +46,7 @@ const ClientManagement = () => {
     }
   ]);
 
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isCreating, setIsCreating] = useState(false);
   const [editingClient, setEditingClient] = useState<Client | null>(null);
   const [formData, setFormData] = useState({
     name: "",
@@ -74,6 +73,7 @@ const ClientManagement = () => {
       address: ""
     });
     setEditingClient(null);
+    setIsCreating(false);
   };
 
   const handleInputChange = (field: string, value: string) => {
@@ -107,7 +107,6 @@ const ClientManagement = () => {
       toast.success("Cliente criado com sucesso!");
     }
 
-    setIsDialogOpen(false);
     resetForm();
   };
 
@@ -124,7 +123,7 @@ const ClientManagement = () => {
       contact2Email: client.contact2Email || "",
       address: client.address || ""
     });
-    setIsDialogOpen(true);
+    setIsCreating(true);
   };
 
   const handleDelete = (id: string) => {
@@ -146,140 +145,136 @@ const ClientManagement = () => {
                 Gerir informações de clientes e contactos
               </CardDescription>
             </div>
-            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-              <DialogTrigger asChild>
-                <Button onClick={resetForm} className="bg-green-600 hover:bg-green-700">
-                  <Plus className="w-4 h-4 mr-2" />
-                  Novo Cliente
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="max-w-2xl">
-                <DialogHeader>
-                  <DialogTitle>
-                    {editingClient ? "Editar Cliente" : "Novo Cliente"}
-                  </DialogTitle>
-                  <DialogDescription>
-                    Preencha os dados do cliente e contactos.
-                  </DialogDescription>
-                </DialogHeader>
-                <div className="space-y-6 mt-4">
-                  {/* Dados do Cliente */}
-                  <div className="space-y-4">
-                    <h3 className="text-lg font-semibold">Dados do Cliente</h3>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="col-span-2">
-                        <Label htmlFor="name">Nome do Cliente *</Label>
-                        <Input
-                          id="name"
-                          value={formData.name}
-                          onChange={(e) => handleInputChange("name", e.target.value)}
-                          placeholder="Nome da empresa"
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="taxNumber">Contribuinte</Label>
-                        <Input
-                          id="taxNumber"
-                          value={formData.taxNumber}
-                          onChange={(e) => handleInputChange("taxNumber", e.target.value)}
-                          placeholder="123456789"
-                        />
-                      </div>
-                      <div className="col-span-2">
-                        <Label htmlFor="address">Morada</Label>
-                        <Input
-                          id="address"
-                          value={formData.address}
-                          onChange={(e) => handleInputChange("address", e.target.value)}
-                          placeholder="Rua, número, cidade"
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Contacto Principal */}
-                  <div className="space-y-4">
-                    <h3 className="text-lg font-semibold">Contacto Principal *</h3>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="col-span-2">
-                        <Label htmlFor="contact1Name">Nome *</Label>
-                        <Input
-                          id="contact1Name"
-                          value={formData.contact1Name}
-                          onChange={(e) => handleInputChange("contact1Name", e.target.value)}
-                          placeholder="Nome do contacto"
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="contact1Phone">Telemóvel *</Label>
-                        <Input
-                          id="contact1Phone"
-                          value={formData.contact1Phone}
-                          onChange={(e) => handleInputChange("contact1Phone", e.target.value)}
-                          placeholder="912345678"
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="contact1Email">Email *</Label>
-                        <Input
-                          id="contact1Email"
-                          type="email"
-                          value={formData.contact1Email}
-                          onChange={(e) => handleInputChange("contact1Email", e.target.value)}
-                          placeholder="email@empresa.pt"
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Contacto Secundário */}
-                  <div className="space-y-4">
-                    <h3 className="text-lg font-semibold">Contacto Secundário (Opcional)</h3>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="col-span-2">
-                        <Label htmlFor="contact2Name">Nome</Label>
-                        <Input
-                          id="contact2Name"
-                          value={formData.contact2Name}
-                          onChange={(e) => handleInputChange("contact2Name", e.target.value)}
-                          placeholder="Nome do contacto"
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="contact2Phone">Telemóvel</Label>
-                        <Input
-                          id="contact2Phone"
-                          value={formData.contact2Phone}
-                          onChange={(e) => handleInputChange("contact2Phone", e.target.value)}
-                          placeholder="913456789"
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="contact2Email">Email</Label>
-                        <Input
-                          id="contact2Email"
-                          type="email"
-                          value={formData.contact2Email}
-                          onChange={(e) => handleInputChange("contact2Email", e.target.value)}
-                          placeholder="email2@empresa.pt"
-                        />
-                      </div>
-                    </div>
-                  </div>
-                </div>
-                <div className="flex justify-end gap-2 mt-6">
-                  <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
-                    Cancelar
-                  </Button>
-                  <Button onClick={handleSubmit} className="bg-green-600 hover:bg-green-700">
-                    {editingClient ? "Atualizar" : "Criar"}
-                  </Button>
-                </div>
-              </DialogContent>
-            </Dialog>
+            {!isCreating && (
+              <Button onClick={() => setIsCreating(true)} className="bg-green-600 hover:bg-green-700">
+                <Plus className="w-4 h-4 mr-2" />
+                Novo Cliente
+              </Button>
+            )}
           </div>
         </CardHeader>
         <CardContent>
+          {isCreating && (
+            <div className="mb-6 p-4 border rounded-lg bg-gray-50">
+              <h3 className="text-lg font-semibold mb-4">
+                {editingClient ? "Editar Cliente" : "Novo Cliente"}
+              </h3>
+              <div className="space-y-6">
+                {/* Dados do Cliente */}
+                <div className="space-y-4">
+                  <h4 className="font-medium text-gray-700">Dados do Cliente</h4>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="col-span-2">
+                      <Label htmlFor="name">Nome do Cliente *</Label>
+                      <Input
+                        id="name"
+                        value={formData.name}
+                        onChange={(e) => handleInputChange("name", e.target.value)}
+                        placeholder="Nome da empresa"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="taxNumber">Contribuinte</Label>
+                      <Input
+                        id="taxNumber"
+                        value={formData.taxNumber}
+                        onChange={(e) => handleInputChange("taxNumber", e.target.value)}
+                        placeholder="123456789"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="address">Morada</Label>
+                      <Input
+                        id="address"
+                        value={formData.address}
+                        onChange={(e) => handleInputChange("address", e.target.value)}
+                        placeholder="Rua, número, cidade"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Contacto Principal */}
+                <div className="space-y-4">
+                  <h4 className="font-medium text-gray-700">Contacto Principal *</h4>
+                  <div className="grid grid-cols-3 gap-4">
+                    <div>
+                      <Label htmlFor="contact1Name">Nome *</Label>
+                      <Input
+                        id="contact1Name"
+                        value={formData.contact1Name}
+                        onChange={(e) => handleInputChange("contact1Name", e.target.value)}
+                        placeholder="Nome do contacto"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="contact1Phone">Telemóvel *</Label>
+                      <Input
+                        id="contact1Phone"
+                        value={formData.contact1Phone}
+                        onChange={(e) => handleInputChange("contact1Phone", e.target.value)}
+                        placeholder="912345678"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="contact1Email">Email *</Label>
+                      <Input
+                        id="contact1Email"
+                        type="email"
+                        value={formData.contact1Email}
+                        onChange={(e) => handleInputChange("contact1Email", e.target.value)}
+                        placeholder="email@empresa.pt"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Contacto Secundário */}
+                <div className="space-y-4">
+                  <h4 className="font-medium text-gray-700">Contacto Secundário (Opcional)</h4>
+                  <div className="grid grid-cols-3 gap-4">
+                    <div>
+                      <Label htmlFor="contact2Name">Nome</Label>
+                      <Input
+                        id="contact2Name"
+                        value={formData.contact2Name}
+                        onChange={(e) => handleInputChange("contact2Name", e.target.value)}
+                        placeholder="Nome do contacto"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="contact2Phone">Telemóvel</Label>
+                      <Input
+                        id="contact2Phone"
+                        value={formData.contact2Phone}
+                        onChange={(e) => handleInputChange("contact2Phone", e.target.value)}
+                        placeholder="913456789"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="contact2Email">Email</Label>
+                      <Input
+                        id="contact2Email"
+                        type="email"
+                        value={formData.contact2Email}
+                        onChange={(e) => handleInputChange("contact2Email", e.target.value)}
+                        placeholder="email2@empresa.pt"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div className="flex justify-end gap-2 mt-6">
+                <Button variant="outline" onClick={resetForm}>
+                  Cancelar
+                </Button>
+                <Button onClick={handleSubmit} className="bg-green-600 hover:bg-green-700">
+                  {editingClient ? "Atualizar" : "Criar"}
+                </Button>
+              </div>
+            </div>
+          )}
+
           <Table>
             <TableHeader>
               <TableRow>

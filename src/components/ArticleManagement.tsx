@@ -7,7 +7,6 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Plus, Edit, Trash2, Package } from "lucide-react";
 import { toast } from "sonner";
@@ -50,7 +49,7 @@ const ArticleManagement = () => {
     }
   ]);
 
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isCreating, setIsCreating] = useState(false);
   const [editingArticle, setEditingArticle] = useState<Article | null>(null);
   const [formData, setFormData] = useState({
     name: "",
@@ -90,7 +89,6 @@ const ArticleManagement = () => {
       marginEuro = pvp - costPrice;
       marginPercent = pvp > 0 ? (marginEuro / pvp) * 100 : 0;
     } else if (field === "pvp") {
-      // Se mudar PVP, manter % da margem
       const currentMarginPercent = parseFloat(currentData.marginPercent) || 0;
       marginPercent = currentMarginPercent;
       marginEuro = (pvp * marginPercent) / 100;
@@ -128,6 +126,7 @@ const ArticleManagement = () => {
       costPrice: ""
     });
     setEditingArticle(null);
+    setIsCreating(false);
   };
 
   const handleSubmit = () => {
@@ -160,7 +159,6 @@ const ArticleManagement = () => {
       toast.success("Artigo criado com sucesso!");
     }
 
-    setIsDialogOpen(false);
     resetForm();
   };
 
@@ -175,7 +173,7 @@ const ArticleManagement = () => {
       marginEuro: article.marginEuro.toString(),
       costPrice: article.costPrice.toString()
     });
-    setIsDialogOpen(true);
+    setIsCreating(true);
   };
 
   const handleDelete = (id: string) => {
@@ -207,114 +205,110 @@ const ArticleManagement = () => {
                 Gerir artigos com cálculos automáticos de margens e comissões
               </CardDescription>
             </div>
-            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-              <DialogTrigger asChild>
-                <Button onClick={resetForm} className="bg-blue-600 hover:bg-blue-700">
-                  <Plus className="w-4 h-4 mr-2" />
-                  Novo Artigo
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="max-w-2xl">
-                <DialogHeader>
-                  <DialogTitle>
-                    {editingArticle ? "Editar Artigo" : "Novo Artigo"}
-                  </DialogTitle>
-                  <DialogDescription>
-                    Preencha os dados do artigo. Os cálculos de margem são automáticos.
-                  </DialogDescription>
-                </DialogHeader>
-                <div className="grid grid-cols-2 gap-4 mt-4">
-                  <div className="col-span-2">
-                    <Label htmlFor="name">Nome *</Label>
-                    <Input
-                      id="name"
-                      value={formData.name}
-                      onChange={(e) => handleInputChange("name", e.target.value)}
-                      placeholder="Nome do artigo"
-                    />
-                  </div>
-                  <div className="col-span-2">
-                    <Label htmlFor="description">Descrição</Label>
-                    <Textarea
-                      id="description"
-                      value={formData.description}
-                      onChange={(e) => handleInputChange("description", e.target.value)}
-                      placeholder="Descrição do artigo"
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="group">Grupo *</Label>
-                    <Select value={formData.group} onValueChange={(value) => handleInputChange("group", value)}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selecionar grupo" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="Serviços">Serviços (5%)</SelectItem>
-                        <SelectItem value="Pack de horas">Pack de horas (10%)</SelectItem>
-                        <SelectItem value="Marketing">Marketing (20%)</SelectItem>
-                        <SelectItem value="Sites">Sites (7.5%)</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div>
-                    <Label htmlFor="pvp">PVP (€) *</Label>
-                    <Input
-                      id="pvp"
-                      type="number"
-                      step="0.01"
-                      value={formData.pvp}
-                      onChange={(e) => handleInputChange("pvp", e.target.value)}
-                      placeholder="0.00"
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="marginPercent">Margem %</Label>
-                    <Input
-                      id="marginPercent"
-                      type="number"
-                      step="0.01"
-                      value={formData.marginPercent}
-                      onChange={(e) => handleInputChange("marginPercent", e.target.value)}
-                      placeholder="0.00"
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="marginEuro">Margem €</Label>
-                    <Input
-                      id="marginEuro"
-                      type="number"
-                      step="0.01"
-                      value={formData.marginEuro}
-                      onChange={(e) => handleInputChange("marginEuro", e.target.value)}
-                      placeholder="0.00"
-                    />
-                  </div>
-                  <div className="col-span-2">
-                    <Label htmlFor="costPrice">Preço de Custo (calculado)</Label>
-                    <Input
-                      id="costPrice"
-                      type="number"
-                      step="0.01"
-                      value={formData.costPrice}
-                      onChange={(e) => handleInputChange("costPrice", e.target.value)}
-                      placeholder="0.00"
-                      className="bg-gray-50"
-                    />
-                  </div>
-                </div>
-                <div className="flex justify-end gap-2 mt-6">
-                  <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
-                    Cancelar
-                  </Button>
-                  <Button onClick={handleSubmit} className="bg-blue-600 hover:bg-blue-700">
-                    {editingArticle ? "Atualizar" : "Criar"}
-                  </Button>
-                </div>
-              </DialogContent>
-            </Dialog>
+            {!isCreating && (
+              <Button onClick={() => setIsCreating(true)} className="bg-blue-600 hover:bg-blue-700">
+                <Plus className="w-4 h-4 mr-2" />
+                Novo Artigo
+              </Button>
+            )}
           </div>
         </CardHeader>
         <CardContent>
+          {isCreating && (
+            <div className="mb-6 p-4 border rounded-lg bg-gray-50">
+              <h3 className="text-lg font-semibold mb-4">
+                {editingArticle ? "Editar Artigo" : "Novo Artigo"}
+              </h3>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="col-span-2">
+                  <Label htmlFor="name">Nome *</Label>
+                  <Input
+                    id="name"
+                    value={formData.name}
+                    onChange={(e) => handleInputChange("name", e.target.value)}
+                    placeholder="Nome do artigo"
+                  />
+                </div>
+                <div className="col-span-2">
+                  <Label htmlFor="description">Descrição</Label>
+                  <Textarea
+                    id="description"
+                    value={formData.description}
+                    onChange={(e) => handleInputChange("description", e.target.value)}
+                    placeholder="Descrição do artigo"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="group">Grupo *</Label>
+                  <Select value={formData.group} onValueChange={(value) => handleInputChange("group", value)}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecionar grupo" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Serviços">Serviços (5%)</SelectItem>
+                      <SelectItem value="Pack de horas">Pack de horas (10%)</SelectItem>
+                      <SelectItem value="Marketing">Marketing (20%)</SelectItem>
+                      <SelectItem value="Sites">Sites (7.5%)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label htmlFor="pvp">PVP (€) *</Label>
+                  <Input
+                    id="pvp"
+                    type="number"
+                    step="0.01"
+                    value={formData.pvp}
+                    onChange={(e) => handleInputChange("pvp", e.target.value)}
+                    placeholder="0.00"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="marginPercent">Margem %</Label>
+                  <Input
+                    id="marginPercent"
+                    type="number"
+                    step="0.01"
+                    value={formData.marginPercent}
+                    onChange={(e) => handleInputChange("marginPercent", e.target.value)}
+                    placeholder="0.00"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="marginEuro">Margem €</Label>
+                  <Input
+                    id="marginEuro"
+                    type="number"
+                    step="0.01"
+                    value={formData.marginEuro}
+                    onChange={(e) => handleInputChange("marginEuro", e.target.value)}
+                    placeholder="0.00"
+                  />
+                </div>
+                <div className="col-span-2">
+                  <Label htmlFor="costPrice">Preço de Custo (calculado)</Label>
+                  <Input
+                    id="costPrice"
+                    type="number"
+                    step="0.01"
+                    value={formData.costPrice}
+                    onChange={(e) => handleInputChange("costPrice", e.target.value)}
+                    placeholder="0.00"
+                    className="bg-gray-50"
+                  />
+                </div>
+              </div>
+              <div className="flex justify-end gap-2 mt-4">
+                <Button variant="outline" onClick={resetForm}>
+                  Cancelar
+                </Button>
+                <Button onClick={handleSubmit} className="bg-blue-600 hover:bg-blue-700">
+                  {editingArticle ? "Atualizar" : "Criar"}
+                </Button>
+              </div>
+            </div>
+          )}
+
           <Table>
             <TableHeader>
               <TableRow>
