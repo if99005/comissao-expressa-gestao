@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Plus, Edit, Trash2, FileText, Eye } from "lucide-react";
 import { toast } from "sonner";
@@ -85,7 +85,7 @@ const ProposalManagement = () => {
     }
   ]);
 
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isCreating, setIsCreating] = useState(false);
   const [isArticleDialogOpen, setIsArticleDialogOpen] = useState(false);
   const [editingProposal, setEditingProposal] = useState<Proposal | null>(null);
   const [selectedProposal, setSelectedProposal] = useState<Proposal | null>(null);
@@ -181,7 +181,7 @@ const ProposalManagement = () => {
       toast.success("Proposta criada com sucesso!");
     }
 
-    setIsDialogOpen(false);
+    setIsCreating(false);
     resetForm();
   };
 
@@ -192,7 +192,7 @@ const ProposalManagement = () => {
       clientId: proposal.clientId,
       clientName: proposal.clientName
     });
-    setIsDialogOpen(true);
+    setIsCreating(true);
   };
 
   const handleDelete = (id: string) => {
@@ -284,66 +284,62 @@ const ProposalManagement = () => {
                 Gerir propostas comerciais com artigos e comissões
               </CardDescription>
             </div>
-            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-              <DialogTrigger asChild>
-                <Button onClick={resetForm} className="bg-orange-600 hover:bg-orange-700">
-                  <Plus className="w-4 h-4 mr-2" />
-                  Nova Proposta
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="max-w-md">
-                <DialogHeader>
-                  <DialogTitle>
-                    {editingProposal ? "Editar Proposta" : "Nova Proposta"}
-                  </DialogTitle>
-                  <DialogDescription>
-                    Defina o cliente e estado da proposta.
-                  </DialogDescription>
-                </DialogHeader>
-                <div className="space-y-4 mt-4">
-                  <div>
-                    <Label htmlFor="clientId">Cliente *</Label>
-                    <Select value={formData.clientId} onValueChange={(value) => handleInputChange("clientId", value)}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selecionar cliente" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {clients.map(client => (
-                          <SelectItem key={client.id} value={client.id}>
-                            {client.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div>
-                    <Label htmlFor="status">Estado *</Label>
-                    <Select value={formData.status} onValueChange={(value) => handleInputChange("status", value)}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selecionar estado" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="Aberta">Aberta</SelectItem>
-                        <SelectItem value="Enviada">Enviada</SelectItem>
-                        <SelectItem value="Ganha">Ganha</SelectItem>
-                        <SelectItem value="Perdida">Perdida</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-                <div className="flex justify-end gap-2 mt-6">
-                  <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
-                    Cancelar
-                  </Button>
-                  <Button onClick={handleSubmit} className="bg-orange-600 hover:bg-orange-700">
-                    {editingProposal ? "Atualizar" : "Criar"}
-                  </Button>
-                </div>
-              </DialogContent>
-            </Dialog>
+            {!isCreating && (
+              <Button onClick={() => setIsCreating(true)} className="bg-orange-600 hover:bg-orange-700">
+                <Plus className="w-4 h-4 mr-2" />
+                Nova Proposta
+              </Button>
+            )}
           </div>
         </CardHeader>
         <CardContent>
+          {isCreating && (
+            <div className="mb-6 p-4 border rounded-lg bg-gray-50">
+              <h3 className="text-lg font-semibold mb-4">
+                {editingProposal ? "Editar Proposta" : "Nova Proposta"}
+              </h3>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="clientId">Cliente *</Label>
+                  <Select value={formData.clientId} onValueChange={(value) => handleInputChange("clientId", value)}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecionar cliente" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {clients.map(client => (
+                        <SelectItem key={client.id} value={client.id}>
+                          {client.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label htmlFor="status">Estado *</Label>
+                  <Select value={formData.status} onValueChange={(value) => handleInputChange("status", value)}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecionar estado" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Aberta">Aberta</SelectItem>
+                      <SelectItem value="Enviada">Enviada</SelectItem>
+                      <SelectItem value="Ganha">Ganha</SelectItem>
+                      <SelectItem value="Perdida">Perdida</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="flex justify-end gap-2 mt-4">
+                <Button variant="outline" onClick={() => { setIsCreating(false); resetForm(); }}>
+                  Cancelar
+                </Button>
+                <Button onClick={handleSubmit} className="bg-orange-600 hover:bg-orange-700">
+                  {editingProposal ? "Atualizar" : "Criar"}
+                </Button>
+              </div>
+            </div>
+          )}
+
           <Table>
             <TableHeader>
               <TableRow>
