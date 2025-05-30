@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -22,6 +21,8 @@ interface ProposalArticle {
   costPrice: number;
   commission: number;
   quantity: number;
+  isFromCatalog: boolean; // indica se vem do catálogo ou é linha avulsa
+  catalogArticleId?: string; // ID do artigo no catálogo se aplicável
 }
 
 interface Proposal {
@@ -53,7 +54,9 @@ const ProposalManagement = () => {
           marginEuro: 1500,
           costPrice: 1000,
           commission: 112.50,
-          quantity: 1
+          quantity: 1,
+          isFromCatalog: true,
+          catalogArticleId: "1"
         }
       ],
       totalValue: 2500,
@@ -76,7 +79,9 @@ const ProposalManagement = () => {
           marginEuro: 400,
           costPrice: 400,
           commission: 80,
-          quantity: 3
+          quantity: 3,
+          isFromCatalog: true,
+          catalogArticleId: "2"
         }
       ],
       totalValue: 2400,
@@ -93,6 +98,22 @@ const ProposalManagement = () => {
     status: "",
     clientId: "",
     clientName: ""
+  });
+
+  // Estados para gestão de artigos
+  const [isAddingArticle, setIsAddingArticle] = useState(false);
+  const [editingArticle, setEditingArticle] = useState<ProposalArticle | null>(null);
+  const [articleFormData, setArticleFormData] = useState({
+    type: "catalog", // "catalog" ou "custom"
+    catalogArticleId: "",
+    name: "",
+    description: "",
+    group: "",
+    pvp: "",
+    marginPercent: "",
+    marginEuro: "",
+    costPrice: "",
+    quantity: "1"
   });
 
   // Mock data de clientes
@@ -133,6 +154,29 @@ const ProposalManagement = () => {
     quantity: "1"
   });
 
+  // Funções de cálculo
+  const calculateCommission = (group: string, marginEuro: number) => {
+    const rates = {
+      "Serviços": 0.05,
+      "Pack de horas": 0.10,
+      "Marketing": 0.20,
+      "Sites": 0.075
+    };
+    return marginEuro * (rates[group as keyof typeof rates] || 0);
+  };
+
+  const calculateFromMarginPercent = (pvp: number, marginPercent: number) => {
+    const marginEuro = (pvp * marginPercent) / 100;
+    const costPrice = pvp - marginEuro;
+    return { marginEuro, costPrice };
+  };
+
+  const calculateFromMarginEuro = (pvp: number, marginEuro: number) => {
+    const marginPercent = (marginEuro / pvp) * 100;
+    const costPrice = pvp - marginEuro;
+    return { marginPercent, costPrice };
+  };
+
   const resetForm = () => {
     setFormData({
       status: "Aberta",
@@ -141,6 +185,23 @@ const ProposalManagement = () => {
     });
     setEditingProposal(null);
     setSelectedProposal(null);
+  };
+
+  const resetArticleForm = () => {
+    setArticleFormData({
+      type: "catalog",
+      catalogArticleId: "",
+      name: "",
+      description: "",
+      group: "",
+      pvp: "",
+      marginPercent: "",
+      marginEuro: "",
+      costPrice: "",
+      quantity: "1"
+    });
+    setEditingArticle(null);
+    setIsAddingArticle(false);
   };
 
   const handleInputChange = (field: string, value: string) => {
@@ -154,6 +215,48 @@ const ProposalManagement = () => {
     } else {
       setFormData(prev => ({ ...prev, [field]: value }));
     }
+  };
+
+  const handleArticleInputChange = (field: string, value: string) => {
+    setArticleFormData(prev => {
+      const newData = { ...prev, [field]: value };
+
+      // Se selecionou artigo do catálogo, preencher campos
+      if (field === "catalogArticleId" && value) {
+        const article = availableArticles.find(a => a.id === value);
+        if (article) {
+          return {
+            ...newData,
+            name: article.name,
+            description: article.description,
+            group: article.group,
+            pvp: article.pvp.toString(),
+            marginPercent: article.marginPercent.toString(),
+            marginEuro: article.marginEuro.toString(),
+            costPrice: article.costPrice.toString()
+          };
+        }
+      }
+
+      // Cálculos automáticos para linhas customizadas
+      if (field === "pvp" || field === "marginPercent" || field === "marginEuro") {
+        const pvp = parseFloat(field === "pvp" ? value : newData.pvp) || 0;
+        
+        if (field === "marginPercent" && value) {
+          const marginPercent = parseFloat(value);
+          const { marginEuro, costPrice } = calculateFromMarginPercent(pvp, marginPercent);
+          newData.marginEuro = marginEuro.toFixed(2);
+          newData.costPrice = costPrice.toFixed(2);
+        } else if (field === "marginEuro" && value) {
+          const marginEuro = parseFloat(value);
+          const { marginPercent, costPrice } = calculateFromMarginEuro(pvp, marginEuro);
+          newData.marginPercent = marginPercent.toFixed(2);
+          newData.costPrice = costPrice.toFixed(2);
+        }
+      }
+
+      return newData;
+    });
   };
 
   const handleSubmit = () => {
@@ -173,6 +276,10 @@ const ProposalManagement = () => {
       createdDate: new Date().toISOString().split('T')[0]
     };
 
+    // Recalcular totais
+    proposalData.totalValue = proposalData.articles.reduce((sum, art) => sum + (art.pvp * art.quantity), 0);
+    proposalData.totalCommission = proposalData.articles.reduce((sum, art) => sum + art.commission, 0);
+
     if (editingProposal) {
       setProposals(prev => prev.map(p => p.id === editingProposal.id ? proposalData : p));
       toast.success("Proposta atualizada com sucesso!");
@@ -185,6 +292,58 @@ const ProposalManagement = () => {
     resetForm();
   };
 
+  const handleSubmitArticle = () => {
+    if (!editingProposal) return;
+
+    // Validações
+    if (articleFormData.type === "catalog" && !articleFormData.catalogArticleId) {
+      toast.error("Selecione um artigo do catálogo!");
+      return;
+    }
+
+    if (articleFormData.type === "custom" && (!articleFormData.name || !articleFormData.group || !articleFormData.pvp)) {
+      toast.error("Preencha os campos obrigatórios!");
+      return;
+    }
+
+    const quantity = parseInt(articleFormData.quantity) || 1;
+    const pvp = parseFloat(articleFormData.pvp) || 0;
+    const marginEuro = parseFloat(articleFormData.marginEuro) || 0;
+    const commission = calculateCommission(articleFormData.group, marginEuro) * quantity;
+
+    const newArticle: ProposalArticle = {
+      id: editingArticle?.id || Date.now().toString(),
+      name: articleFormData.name,
+      description: articleFormData.description,
+      group: articleFormData.group as ProposalArticle["group"],
+      pvp,
+      marginPercent: parseFloat(articleFormData.marginPercent) || 0,
+      marginEuro,
+      costPrice: parseFloat(articleFormData.costPrice) || 0,
+      commission,
+      quantity,
+      isFromCatalog: articleFormData.type === "catalog",
+      catalogArticleId: articleFormData.type === "catalog" ? articleFormData.catalogArticleId : undefined
+    };
+
+    const updatedProposal = {
+      ...editingProposal,
+      articles: editingArticle 
+        ? editingProposal.articles.map(a => a.id === editingArticle.id ? newArticle : a)
+        : [...editingProposal.articles, newArticle]
+    };
+
+    // Recalcular totais
+    updatedProposal.totalValue = updatedProposal.articles.reduce((sum, art) => sum + (art.pvp * art.quantity), 0);
+    updatedProposal.totalCommission = updatedProposal.articles.reduce((sum, art) => sum + art.commission, 0);
+
+    setProposals(prev => prev.map(p => p.id === editingProposal.id ? updatedProposal : p));
+    setEditingProposal(updatedProposal);
+    
+    toast.success(editingArticle ? "Artigo atualizado!" : "Artigo adicionado!");
+    resetArticleForm();
+  };
+
   const handleEdit = (proposal: Proposal) => {
     setEditingProposal(proposal);
     setFormData({
@@ -195,9 +354,43 @@ const ProposalManagement = () => {
     setIsCreating(true);
   };
 
+  const handleEditArticle = (article: ProposalArticle) => {
+    setEditingArticle(article);
+    setArticleFormData({
+      type: article.isFromCatalog ? "catalog" : "custom",
+      catalogArticleId: article.catalogArticleId || "",
+      name: article.name,
+      description: article.description,
+      group: article.group,
+      pvp: article.pvp.toString(),
+      marginPercent: article.marginPercent.toString(),
+      marginEuro: article.marginEuro.toString(),
+      costPrice: article.costPrice.toString(),
+      quantity: article.quantity.toString()
+    });
+    setIsAddingArticle(true);
+  };
+
   const handleDelete = (id: string) => {
     setProposals(prev => prev.filter(p => p.id !== id));
     toast.success("Proposta eliminada com sucesso!");
+  };
+
+  const handleDeleteArticle = (articleId: string) => {
+    if (!editingProposal) return;
+
+    const updatedProposal = {
+      ...editingProposal,
+      articles: editingProposal.articles.filter(a => a.id !== articleId)
+    };
+
+    // Recalcular totais
+    updatedProposal.totalValue = updatedProposal.articles.reduce((sum, art) => sum + (art.pvp * art.quantity), 0);
+    updatedProposal.totalCommission = updatedProposal.articles.reduce((sum, art) => sum + art.commission, 0);
+
+    setProposals(prev => prev.map(p => p.id === editingProposal.id ? updatedProposal : p));
+    setEditingProposal(updatedProposal);
+    toast.success("Artigo removido!");
   };
 
   const handleViewProposal = (proposal: Proposal) => {
@@ -215,7 +408,9 @@ const ProposalManagement = () => {
     const proposalArticle: ProposalArticle = {
       ...article,
       quantity,
-      commission: article.commission * quantity
+      commission: article.commission * quantity,
+      isFromCatalog: true,
+      catalogArticleId: article.id
     };
 
     const updatedProposal = {
@@ -294,10 +489,12 @@ const ProposalManagement = () => {
         </CardHeader>
         <CardContent>
           {isCreating && (
-            <div className="mb-6 p-4 border rounded-lg bg-gray-50">
-              <h3 className="text-lg font-semibold mb-4">
+            <div className="mb-6 p-4 border rounded-lg bg-gray-50 space-y-6">
+              <h3 className="text-lg font-semibold">
                 {editingProposal ? "Editar Proposta" : "Nova Proposta"}
               </h3>
+              
+              {/* Formulário da proposta */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="clientId">Cliente *</Label>
@@ -329,7 +526,239 @@ const ProposalManagement = () => {
                   </Select>
                 </div>
               </div>
-              <div className="flex justify-end gap-2 mt-4">
+
+              {/* Artigos da proposta */}
+              {editingProposal && (
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h4 className="font-semibold">Artigos da Proposta</h4>
+                    {!isAddingArticle && (
+                      <Button onClick={() => setIsAddingArticle(true)} className="bg-blue-600 hover:bg-blue-700">
+                        <Plus className="w-4 h-4 mr-2" />
+                        Adicionar Artigo
+                      </Button>
+                    )}
+                  </div>
+
+                  {/* Formulário de artigo */}
+                  {isAddingArticle && (
+                    <div className="border rounded-lg p-4 bg-white space-y-4">
+                      <h5 className="font-medium">{editingArticle ? "Editar Artigo" : "Novo Artigo"}</h5>
+                      
+                      {/* Tipo de artigo */}
+                      <div>
+                        <Label>Tipo de Artigo</Label>
+                        <Select value={articleFormData.type} onValueChange={(value) => handleArticleInputChange("type", value)}>
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="catalog">Do Catálogo</SelectItem>
+                            <SelectItem value="custom">Linha Avulsa</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      {/* Seleção de artigo do catálogo */}
+                      {articleFormData.type === "catalog" && (
+                        <div>
+                          <Label>Artigo do Catálogo</Label>
+                          <Select value={articleFormData.catalogArticleId} onValueChange={(value) => handleArticleInputChange("catalogArticleId", value)}>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Selecionar artigo" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {availableArticles.map(article => (
+                                <SelectItem key={article.id} value={article.id}>
+                                  {article.name} - €{article.pvp}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      )}
+
+                      {/* Campos do artigo */}
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <Label>Nome *</Label>
+                          <Input
+                            value={articleFormData.name}
+                            onChange={(e) => handleArticleInputChange("name", e.target.value)}
+                            disabled={articleFormData.type === "catalog"}
+                          />
+                        </div>
+                        <div>
+                          <Label>Grupo *</Label>
+                          <Select 
+                            value={articleFormData.group} 
+                            onValueChange={(value) => handleArticleInputChange("group", value)}
+                            disabled={articleFormData.type === "catalog"}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Selecionar grupo" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="Serviços">Serviços</SelectItem>
+                              <SelectItem value="Pack de horas">Pack de horas</SelectItem>
+                              <SelectItem value="Marketing">Marketing</SelectItem>
+                              <SelectItem value="Sites">Sites</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+
+                      <div>
+                        <Label>Descrição</Label>
+                        <Input
+                          value={articleFormData.description}
+                          onChange={(e) => handleArticleInputChange("description", e.target.value)}
+                          disabled={articleFormData.type === "catalog"}
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-5 gap-4">
+                        <div>
+                          <Label>PVP (€) *</Label>
+                          <Input
+                            type="number"
+                            step="0.01"
+                            value={articleFormData.pvp}
+                            onChange={(e) => handleArticleInputChange("pvp", e.target.value)}
+                            disabled={articleFormData.type === "catalog"}
+                          />
+                        </div>
+                        <div>
+                          <Label>Margem %</Label>
+                          <Input
+                            type="number"
+                            step="0.01"
+                            value={articleFormData.marginPercent}
+                            onChange={(e) => handleArticleInputChange("marginPercent", e.target.value)}
+                            disabled={articleFormData.type === "catalog"}
+                          />
+                        </div>
+                        <div>
+                          <Label>Margem €</Label>
+                          <Input
+                            type="number"
+                            step="0.01"
+                            value={articleFormData.marginEuro}
+                            onChange={(e) => handleArticleInputChange("marginEuro", e.target.value)}
+                            disabled={articleFormData.type === "catalog"}
+                          />
+                        </div>
+                        <div>
+                          <Label>Preço Custo</Label>
+                          <Input
+                            type="number"
+                            step="0.01"
+                            value={articleFormData.costPrice}
+                            readOnly
+                            className="bg-gray-100"
+                          />
+                        </div>
+                        <div>
+                          <Label>Quantidade *</Label>
+                          <Input
+                            type="number"
+                            min="1"
+                            value={articleFormData.quantity}
+                            onChange={(e) => handleArticleInputChange("quantity", e.target.value)}
+                          />
+                        </div>
+                      </div>
+
+                      <div className="flex justify-end gap-2">
+                        <Button variant="outline" onClick={resetArticleForm}>
+                          Cancelar
+                        </Button>
+                        <Button onClick={handleSubmitArticle} className="bg-blue-600 hover:bg-blue-700">
+                          {editingArticle ? "Atualizar" : "Adicionar"}
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Lista de artigos */}
+                  {editingProposal.articles.length > 0 && (
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Artigo</TableHead>
+                          <TableHead>Grupo</TableHead>
+                          <TableHead>Qtd</TableHead>
+                          <TableHead>PVP Unit.</TableHead>
+                          <TableHead>Total</TableHead>
+                          <TableHead>Comissão</TableHead>
+                          <TableHead>Tipo</TableHead>
+                          <TableHead className="text-right">Ações</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {editingProposal.articles.map((article) => (
+                          <TableRow key={article.id}>
+                            <TableCell>
+                              <div>
+                                <div className="font-medium">{article.name}</div>
+                                <div className="text-sm text-gray-500">{article.description}</div>
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <Badge className={getGroupColor(article.group)}>
+                                {article.group}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>{article.quantity}</TableCell>
+                            <TableCell>€{article.pvp.toFixed(2)}</TableCell>
+                            <TableCell>€{(article.pvp * article.quantity).toFixed(2)}</TableCell>
+                            <TableCell>€{article.commission.toFixed(2)}</TableCell>
+                            <TableCell>
+                              <Badge variant={article.isFromCatalog ? "default" : "secondary"}>
+                                {article.isFromCatalog ? "Catálogo" : "Avulso"}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <div className="flex justify-end gap-2">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => handleEditArticle(article)}
+                                >
+                                  <Edit className="w-4 h-4" />
+                                </Button>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => handleDeleteArticle(article.id)}
+                                  className="text-red-600 hover:text-red-700"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </Button>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  )}
+
+                  {/* Totais */}
+                  {editingProposal.articles.length > 0 && (
+                    <div className="border-t pt-4">
+                      <div className="flex justify-between items-center text-lg font-semibold">
+                        <span>Totais da Proposta:</span>
+                        <div className="space-x-4">
+                          <span>Valor: €{editingProposal.totalValue.toFixed(2)}</span>
+                          <span>Comissão: €{editingProposal.totalCommission.toFixed(2)}</span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <div className="flex justify-end gap-2">
                 <Button variant="outline" onClick={() => { setIsCreating(false); resetForm(); }}>
                   Cancelar
                 </Button>
