@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -18,6 +17,8 @@ interface Client {
   name: string;
   email?: string;
   phone?: string;
+  nif?: string;
+  address?: string;
 }
 
 interface Article {
@@ -86,7 +87,7 @@ const ProposalManagement = () => {
         .from('proposals')
         .select(`
           *,
-          client:clients(id, name, email, phone)
+          client:clients(id, name, email, phone, nif, address)
         `)
         .order('created_at', { ascending: false });
       
