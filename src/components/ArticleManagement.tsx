@@ -12,6 +12,7 @@ import { toast } from "sonner";
 
 interface Article {
   id: string;
+  reference: string;
   name: string;
   description: string;
   group: "Serviços" | "Pack de horas" | "Marketing" | "Sites";
@@ -28,6 +29,7 @@ const ArticleManagement = () => {
   const [articles, setArticles] = useState<Article[]>([
     {
       id: "1",
+      reference: "WEB001",
       name: "Desenvolvimento Website",
       description: "Criação de website corporativo",
       group: "Sites",
@@ -39,6 +41,7 @@ const ArticleManagement = () => {
     },
     {
       id: "2",
+      reference: "MKT001",
       name: "Campanha Google Ads",
       description: "Gestão de campanha publicitária",
       group: "Marketing",
@@ -54,6 +57,7 @@ const ArticleManagement = () => {
   const [editingArticle, setEditingArticle] = useState<Article | null>(null);
   const [creationMode, setCreationMode] = useState<CreationMode>("pvp");
   const [formData, setFormData] = useState({
+    reference: "",
     name: "",
     description: "",
     group: "",
@@ -152,6 +156,7 @@ const ArticleManagement = () => {
 
   const resetForm = () => {
     setFormData({
+      reference: "",
       name: "",
       description: "",
       group: "",
@@ -166,8 +171,15 @@ const ArticleManagement = () => {
   };
 
   const handleSubmit = () => {
-    if (!formData.name || !formData.group) {
-      toast.error("Preencha os campos obrigatórios!");
+    if (!formData.reference || !formData.name || !formData.group) {
+      toast.error("Referência, nome e grupo são obrigatórios!");
+      return;
+    }
+
+    // Check if reference already exists
+    const existingArticle = articles.find(a => a.reference === formData.reference && a.id !== editingArticle?.id);
+    if (existingArticle) {
+      toast.error("Já existe um artigo com essa referência!");
       return;
     }
 
@@ -187,6 +199,7 @@ const ArticleManagement = () => {
 
     const articleData: Article = {
       id: editingArticle?.id || Date.now().toString(),
+      reference: formData.reference,
       name: formData.name,
       description: formData.description,
       group: group,
@@ -211,6 +224,7 @@ const ArticleManagement = () => {
   const handleEdit = (article: Article) => {
     setEditingArticle(article);
     setFormData({
+      reference: article.reference,
       name: article.name,
       description: article.description,
       group: article.group,
@@ -219,7 +233,7 @@ const ArticleManagement = () => {
       marginEuro: article.marginEuro.toString(),
       costPrice: article.costPrice.toString()
     });
-    setCreationMode("pvp"); // Default to PVP mode when editing
+    setCreationMode("pvp");
     setIsCreating(true);
   };
 
@@ -267,8 +281,18 @@ const ArticleManagement = () => {
                 {editingArticle ? "Editar Artigo" : "Novo Artigo"}
               </h3>
               
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {/* Linha 1: Nome, Modo de Criação, Grupo */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                {/* Linha 1: Referência, Nome, Modo de Criação, Grupo */}
+                <div>
+                  <Label htmlFor="reference">Referência *</Label>
+                  <Input
+                    id="reference"
+                    value={formData.reference}
+                    onChange={(e) => handleInputChange("reference", e.target.value)}
+                    placeholder="REF001"
+                  />
+                </div>
+
                 <div>
                   <Label htmlFor="name">Nome *</Label>
                   <Input
@@ -309,8 +333,8 @@ const ArticleManagement = () => {
                   </Select>
                 </div>
 
-                {/* Linha 2: Descrição (ocupa 3 colunas) */}
-                <div className="md:col-span-2 lg:col-span-3">
+                {/* Linha 2: Descrição (ocupa 4 colunas) */}
+                <div className="md:col-span-2 lg:col-span-4">
                   <Label htmlFor="description">Descrição</Label>
                   <Textarea
                     id="description"
@@ -357,6 +381,17 @@ const ArticleManagement = () => {
                         className="bg-gray-100"
                       />
                     </div>
+                    <div>
+                      <Label htmlFor="costPrice">Preço de Custo (€) (calculado)</Label>
+                      <Input
+                        id="costPrice"
+                        type="number"
+                        step="0.01"
+                        value={formData.costPrice}
+                        readOnly
+                        className="bg-gray-100"
+                      />
+                    </div>
                   </>
                 ) : (
                   <>
@@ -393,36 +428,18 @@ const ArticleManagement = () => {
                         placeholder="0.00"
                       />
                     </div>
+                    <div>
+                      <Label htmlFor="pvp">PVP (€) (calculado)</Label>
+                      <Input
+                        id="pvp"
+                        type="number"
+                        step="0.01"
+                        value={formData.pvp}
+                        readOnly
+                        className="bg-gray-100"
+                      />
+                    </div>
                   </>
-                )}
-
-                {/* Linha 4: Campos calculados */}
-                {creationMode === "cost" && (
-                  <div>
-                    <Label htmlFor="pvp">PVP (€) (calculado)</Label>
-                    <Input
-                      id="pvp"
-                      type="number"
-                      step="0.01"
-                      value={formData.pvp}
-                      readOnly
-                      className="bg-gray-100"
-                    />
-                  </div>
-                )}
-                
-                {creationMode === "pvp" && (
-                  <div>
-                    <Label htmlFor="costPrice">Preço de Custo (€) (calculado)</Label>
-                    <Input
-                      id="costPrice"
-                      type="number"
-                      step="0.01"
-                      value={formData.costPrice}
-                      readOnly
-                      className="bg-gray-100"
-                    />
-                  </div>
                 )}
               </div>
 
@@ -440,6 +457,7 @@ const ArticleManagement = () => {
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead>Referência</TableHead>
                 <TableHead>Nome</TableHead>
                 <TableHead>Grupo</TableHead>
                 <TableHead>PVP</TableHead>
@@ -453,6 +471,7 @@ const ArticleManagement = () => {
             <TableBody>
               {articles.map((article) => (
                 <TableRow key={article.id}>
+                  <TableCell className="font-medium">{article.reference}</TableCell>
                   <TableCell>
                     <div>
                       <div className="font-medium">{article.name}</div>

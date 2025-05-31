@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -26,6 +25,7 @@ interface Article {
   description: string;
   unit: string;
   sale_price: number;
+  purchase_price: number;
   group_name?: string;
 }
 
@@ -36,8 +36,12 @@ interface ProposalLine {
   unit: string;
   quantity: number;
   unit_price: number;
+  cost_price: number;
   discount_percentage: number;
   line_total: number;
+  calculation_mode: 'pvp' | 'cost';
+  margin_percentage: number;
+  margin_euro: number;
 }
 
 interface Proposal {
@@ -209,20 +213,103 @@ const ProposalManagement = () => {
       unit: 'un',
       quantity: 1,
       unit_price: 0,
+      cost_price: 0,
       discount_percentage: 0,
-      line_total: 0
+      line_total: 0,
+      calculation_mode: 'pvp',
+      margin_percentage: 0,
+      margin_euro: 0
     }]);
+  };
+
+  const calculateLineFromPVP = (unitPrice: number, marginPercent: number) => {
+    const marginEuro = (unitPrice * marginPercent) / 100;
+    const costPrice = unitPrice - marginEuro;
+    return { marginEuro, costPrice };
+  };
+
+  const calculateLineFromCost = (costPrice: number, marginValue: number, isPercentage: boolean) => {
+    let marginEuro: number;
+    let marginPercent: number;
+    let unitPrice: number;
+
+    if (isPercentage) {
+      marginPercent = marginValue;
+      marginEuro = (costPrice * marginPercent) / 100;
+      unitPrice = costPrice + marginEuro;
+    } else {
+      marginEuro = marginValue;
+      unitPrice = costPrice + marginEuro;
+      marginPercent = costPrice > 0 ? (marginEuro / costPrice) * 100 : 0;
+    }
+
+    return { marginEuro, marginPercent, unitPrice };
   };
 
   const updateProposalLine = (index: number, field: keyof ProposalLine, value: any) => {
     const newLines = [...proposalLines];
-    newLines[index] = { ...newLines[index], [field]: value };
+    const line = newLines[index];
+    
+    // Atualizar o campo
+    newLines[index] = { ...line, [field]: value };
+    
+    // Recalcular preços baseado no modo de cálculo
+    if (field === 'calculation_mode') {
+      // Reset values when changing calculation mode
+      newLines[index] = {
+        ...newLines[index],
+        unit_price: 0,
+        cost_price: 0,
+        margin_percentage: 0,
+        margin_euro: 0
+      };
+    } else if (line.calculation_mode === 'pvp') {
+      // Calcular a partir do PVP
+      if (field === 'unit_price' || field === 'margin_percentage') {
+        const unitPrice = field === 'unit_price' ? parseFloat(value) || 0 : line.unit_price;
+        const marginPercent = field === 'margin_percentage' ? parseFloat(value) || 0 : line.margin_percentage;
+        
+        if (unitPrice > 0 && marginPercent > 0) {
+          const { marginEuro, costPrice } = calculateLineFromPVP(unitPrice, marginPercent);
+          newLines[index] = {
+            ...newLines[index],
+            margin_euro: marginEuro,
+            cost_price: costPrice
+          };
+        }
+      }
+    } else if (line.calculation_mode === 'cost') {
+      // Calcular a partir do preço de custo
+      if (field === 'cost_price' || field === 'margin_percentage' || field === 'margin_euro') {
+        const costPrice = field === 'cost_price' ? parseFloat(value) || 0 : line.cost_price;
+        
+        if (costPrice > 0) {
+          if (field === 'margin_percentage') {
+            const marginPercent = parseFloat(value) || 0;
+            const { marginEuro, unitPrice } = calculateLineFromCost(costPrice, marginPercent, true);
+            newLines[index] = {
+              ...newLines[index],
+              margin_euro: marginEuro,
+              unit_price: unitPrice
+            };
+          } else if (field === 'margin_euro') {
+            const marginEuro = parseFloat(value) || 0;
+            const { marginPercent, unitPrice } = calculateLineFromCost(costPrice, marginEuro, false);
+            newLines[index] = {
+              ...newLines[index],
+              margin_percentage: marginPercent,
+              unit_price: unitPrice
+            };
+          }
+        }
+      }
+    }
     
     // Recalcular total da linha
-    const line = newLines[index];
-    const subtotal = line.quantity * line.unit_price;
-    const discountAmount = subtotal * (line.discount_percentage / 100);
-    line.line_total = subtotal - discountAmount;
+    const updatedLine = newLines[index];
+    const subtotal = updatedLine.quantity * updatedLine.unit_price;
+    const discountAmount = subtotal * (updatedLine.discount_percentage / 100);
+    updatedLine.line_total = subtotal - discountAmount;
     
     setProposalLines(newLines);
     calculateTotals(newLines);
@@ -253,6 +340,13 @@ const ProposalManagement = () => {
       updateProposalLine(index, 'description', article.description);
       updateProposalLine(index, 'unit', article.unit);
       updateProposalLine(index, 'unit_price', article.sale_price);
+      updateProposalLine(index, 'cost_price', article.purchase_price);
+      
+      // Calculate margin from existing prices
+      const marginEuro = article.sale_price - article.purchase_price;
+      const marginPercent = article.purchase_price > 0 ? (marginEuro / article.purchase_price) * 100 : 0;
+      updateProposalLine(index, 'margin_euro', marginEuro);
+      updateProposalLine(index, 'margin_percentage', marginPercent);
     }
   };
 
@@ -405,7 +499,7 @@ const ProposalManagement = () => {
               </div>
 
               {proposalLines.length > 0 && (
-                <div className="border rounded-lg overflow-hidden">
+                <div className="border rounded-lg overflow-x-auto">
                   <Table>
                     <TableHeader>
                       <TableRow>
@@ -413,7 +507,11 @@ const ProposalManagement = () => {
                         <TableHead>Descrição</TableHead>
                         <TableHead>Unid.</TableHead>
                         <TableHead>Qtd.</TableHead>
+                        <TableHead>Modo Cálculo</TableHead>
                         <TableHead>Preço Unit.</TableHead>
+                        <TableHead>Preço Custo</TableHead>
+                        <TableHead>Margem %</TableHead>
+                        <TableHead>Margem €</TableHead>
                         <TableHead>Desc. %</TableHead>
                         <TableHead>Total</TableHead>
                         <TableHead></TableHead>
@@ -425,12 +523,13 @@ const ProposalManagement = () => {
                           <TableCell>
                             <Select
                               value={line.article_id || ""}
-                              onValueChange={(value) => selectArticle(index, value)}
+                              onValueChange={(value) => value ? selectArticle(index, value) : updateProposalLine(index, 'article_id', null)}
                             >
                               <SelectTrigger className="w-32">
-                                <SelectValue placeholder="Selecionar" />
+                                <SelectValue placeholder="Manual" />
                               </SelectTrigger>
                               <SelectContent>
+                                <SelectItem value="">Manual</SelectItem>
                                 {articles.map((article) => (
                                   <SelectItem key={article.id} value={article.id}>
                                     {article.reference}
@@ -444,6 +543,7 @@ const ProposalManagement = () => {
                               value={line.description}
                               onChange={(e) => updateProposalLine(index, 'description', e.target.value)}
                               placeholder="Descrição"
+                              className="w-40"
                             />
                           </TableCell>
                           <TableCell>
@@ -463,12 +563,56 @@ const ProposalManagement = () => {
                             />
                           </TableCell>
                           <TableCell>
+                            <Select
+                              value={line.calculation_mode}
+                              onValueChange={(value: 'pvp' | 'cost') => updateProposalLine(index, 'calculation_mode', value)}
+                            >
+                              <SelectTrigger className="w-24">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="pvp">PVP</SelectItem>
+                                <SelectItem value="cost">Custo</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </TableCell>
+                          <TableCell>
                             <Input
                               type="number"
                               step="0.01"
                               value={line.unit_price}
                               onChange={(e) => updateProposalLine(index, 'unit_price', parseFloat(e.target.value) || 0)}
                               className="w-24"
+                              readOnly={line.calculation_mode === 'cost'}
+                            />
+                          </TableCell>
+                          <TableCell>
+                            <Input
+                              type="number"
+                              step="0.01"
+                              value={line.cost_price}
+                              onChange={(e) => updateProposalLine(index, 'cost_price', parseFloat(e.target.value) || 0)}
+                              className="w-24"
+                              readOnly={line.calculation_mode === 'pvp'}
+                            />
+                          </TableCell>
+                          <TableCell>
+                            <Input
+                              type="number"
+                              step="0.01"
+                              value={line.margin_percentage}
+                              onChange={(e) => updateProposalLine(index, 'margin_percentage', parseFloat(e.target.value) || 0)}
+                              className="w-20"
+                            />
+                          </TableCell>
+                          <TableCell>
+                            <Input
+                              type="number"
+                              step="0.01"
+                              value={line.margin_euro}
+                              onChange={(e) => updateProposalLine(index, 'margin_euro', parseFloat(e.target.value) || 0)}
+                              className="w-20"
+                              readOnly={line.calculation_mode === 'pvp'}
                             />
                           </TableCell>
                           <TableCell>
