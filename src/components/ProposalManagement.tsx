@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -334,6 +335,18 @@ const ProposalManagement = () => {
   };
 
   const selectArticle = (index: number, articleId: string) => {
+    if (articleId === "manual") {
+      // Reset to manual entry
+      updateProposalLine(index, 'article_id', null);
+      updateProposalLine(index, 'description', '');
+      updateProposalLine(index, 'unit', 'un');
+      updateProposalLine(index, 'unit_price', 0);
+      updateProposalLine(index, 'cost_price', 0);
+      updateProposalLine(index, 'margin_euro', 0);
+      updateProposalLine(index, 'margin_percentage', 0);
+      return;
+    }
+
     const article = articles.find(a => a.id === articleId);
     if (article) {
       updateProposalLine(index, 'article_id', articleId);
@@ -522,14 +535,14 @@ const ProposalManagement = () => {
                         <TableRow key={index}>
                           <TableCell>
                             <Select
-                              value={line.article_id || ""}
-                              onValueChange={(value) => value ? selectArticle(index, value) : updateProposalLine(index, 'article_id', null)}
+                              value={line.article_id || "manual"}
+                              onValueChange={(value) => selectArticle(index, value)}
                             >
                               <SelectTrigger className="w-32">
                                 <SelectValue placeholder="Manual" />
                               </SelectTrigger>
                               <SelectContent>
-                                <SelectItem value="">Manual</SelectItem>
+                                <SelectItem value="manual">Manual</SelectItem>
                                 {articles.map((article) => (
                                   <SelectItem key={article.id} value={article.id}>
                                     {article.reference}
