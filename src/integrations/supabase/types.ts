@@ -9,7 +9,197 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      [_ in never]: never
+      articles: {
+        Row: {
+          created_at: string
+          description: string
+          group_name: string | null
+          id: string
+          purchase_price: number
+          reference: string
+          sale_price: number
+          unit: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description: string
+          group_name?: string | null
+          id?: string
+          purchase_price?: number
+          reference: string
+          sale_price?: number
+          unit?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string
+          group_name?: string | null
+          id?: string
+          purchase_price?: number
+          reference?: string
+          sale_price?: number
+          unit?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      clients: {
+        Row: {
+          address: string | null
+          created_at: string
+          email: string | null
+          id: string
+          name: string
+          nif: string | null
+          phone: string | null
+          updated_at: string
+        }
+        Insert: {
+          address?: string | null
+          created_at?: string
+          email?: string | null
+          id?: string
+          name: string
+          nif?: string | null
+          phone?: string | null
+          updated_at?: string
+        }
+        Update: {
+          address?: string | null
+          created_at?: string
+          email?: string | null
+          id?: string
+          name?: string
+          nif?: string | null
+          phone?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      proposal_lines: {
+        Row: {
+          article_id: string | null
+          created_at: string
+          description: string
+          discount_percentage: number
+          id: string
+          line_total: number
+          proposal_id: string
+          quantity: number
+          sort_order: number
+          unit: string
+          unit_price: number
+        }
+        Insert: {
+          article_id?: string | null
+          created_at?: string
+          description: string
+          discount_percentage?: number
+          id?: string
+          line_total?: number
+          proposal_id: string
+          quantity?: number
+          sort_order?: number
+          unit?: string
+          unit_price?: number
+        }
+        Update: {
+          article_id?: string | null
+          created_at?: string
+          description?: string
+          discount_percentage?: number
+          id?: string
+          line_total?: number
+          proposal_id?: string
+          quantity?: number
+          sort_order?: number
+          unit?: string
+          unit_price?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "proposal_lines_article_id_fkey"
+            columns: ["article_id"]
+            isOneToOne: false
+            referencedRelation: "articles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proposal_lines_proposal_id_fkey"
+            columns: ["proposal_id"]
+            isOneToOne: false
+            referencedRelation: "proposals"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      proposals: {
+        Row: {
+          client_id: string | null
+          commission_amount: number
+          commission_percentage: number
+          created_at: string
+          discount_amount: number
+          discount_percentage: number
+          expiry_date: string | null
+          group_name: string | null
+          id: string
+          notes: string | null
+          number: string
+          proposal_date: string
+          status: Database["public"]["Enums"]["proposal_status"]
+          subtotal: number
+          total: number
+          updated_at: string
+        }
+        Insert: {
+          client_id?: string | null
+          commission_amount?: number
+          commission_percentage?: number
+          created_at?: string
+          discount_amount?: number
+          discount_percentage?: number
+          expiry_date?: string | null
+          group_name?: string | null
+          id?: string
+          notes?: string | null
+          number: string
+          proposal_date?: string
+          status?: Database["public"]["Enums"]["proposal_status"]
+          subtotal?: number
+          total?: number
+          updated_at?: string
+        }
+        Update: {
+          client_id?: string | null
+          commission_amount?: number
+          commission_percentage?: number
+          created_at?: string
+          discount_amount?: number
+          discount_percentage?: number
+          expiry_date?: string | null
+          group_name?: string | null
+          id?: string
+          notes?: string | null
+          number?: string
+          proposal_date?: string
+          status?: Database["public"]["Enums"]["proposal_status"]
+          subtotal?: number
+          total?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "proposals_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
@@ -18,7 +208,12 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
-      [_ in never]: never
+      proposal_status:
+        | "rascunho"
+        | "enviada"
+        | "aprovada"
+        | "rejeitada"
+        | "expirada"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -133,6 +328,14 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      proposal_status: [
+        "rascunho",
+        "enviada",
+        "aprovada",
+        "rejeitada",
+        "expirada",
+      ],
+    },
   },
 } as const

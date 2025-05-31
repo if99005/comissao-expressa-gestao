@@ -1,805 +1,638 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Edit, Trash2, FileText, Eye } from "lucide-react";
-import { toast } from "sonner";
+import { Badge } from "@/components/ui/badge";
+import { Textarea } from "@/components/ui/textarea";
+import { Plus, Save, X, FileText, Eye, Edit, Trash2 } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useToast } from "@/hooks/use-toast";
 
-interface ProposalArticle {
+interface Client {
   id: string;
   name: string;
+  email?: string;
+  phone?: string;
+}
+
+interface Article {
+  id: string;
+  reference: string;
   description: string;
-  group: "Serviços" | "Pack de horas" | "Marketing" | "Sites" | "Consultoria" | "Desenvolvimento" | "Design" | "Suporte";
-  pvp: number;
-  marginPercent: number;
-  marginEuro: number;
-  costPrice: number;
-  commission: number;
+  unit: string;
+  sale_price: number;
+  group_name?: string;
+}
+
+interface ProposalLine {
+  id?: string;
+  article_id?: string;
+  description: string;
+  unit: string;
   quantity: number;
-  isFromCatalog: boolean;
-  catalogArticleId?: string;
+  unit_price: number;
+  discount_percentage: number;
+  line_total: number;
 }
 
 interface Proposal {
-  id: string;
-  status: "Rascunho" | "Aberta" | "Enviada" | "Em Análise" | "Aprovada" | "Ganha" | "Perdida" | "Cancelada";
-  clientId: string;
-  clientName: string;
-  articles: ProposalArticle[];
-  totalValue: number;
-  totalCommission: number;
-  createdDate: string;
+  id?: string;
+  number: string;
+  client_id?: string;
+  status: 'rascunho' | 'enviada' | 'aprovada' | 'rejeitada' | 'expirada';
+  group_name?: string;
+  proposal_date: string;
+  expiry_date?: string;
+  subtotal: number;
+  discount_percentage: number;
+  total: number;
+  commission_percentage: number;
+  notes?: string;
+  client?: Client;
 }
 
 const ProposalManagement = () => {
-  const [proposals, setProposals] = useState<Proposal[]>([
-    {
-      id: "1",
-      status: "Enviada",
-      clientId: "1",
-      clientName: "TechCorp Solutions",
-      articles: [
-        {
-          id: "1",
-          name: "Desenvolvimento Website",
-          description: "Criação de website corporativo",
-          group: "Sites",
-          pvp: 2500,
-          marginPercent: 60,
-          marginEuro: 1500,
-          costPrice: 1000,
-          commission: 112.50,
-          quantity: 1,
-          isFromCatalog: true,
-          catalogArticleId: "1"
-        }
-      ],
-      totalValue: 2500,
-      totalCommission: 112.50,
-      createdDate: "2024-05-28"
-    }
-  ]);
-
-  const [isCreating, setIsCreating] = useState(false);
-  const [isArticleDialogOpen, setIsArticleDialogOpen] = useState(false);
+  const [showForm, setShowForm] = useState(false);
   const [editingProposal, setEditingProposal] = useState<Proposal | null>(null);
-  const [selectedProposal, setSelectedProposal] = useState<Proposal | null>(null);
-  const [formData, setFormData] = useState({
-    status: "Rascunho",
-    clientId: "",
-    clientName: ""
+  const [proposalForm, setProposalForm] = useState<Proposal>({
+    number: '',
+    status: 'rascunho',
+    proposal_date: new Date().toISOString().split('T')[0],
+    subtotal: 0,
+    discount_percentage: 0,
+    total: 0,
+    commission_percentage: 0
   });
+  const [proposalLines, setProposalLines] = useState<ProposalLine[]>([]);
+  
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
 
-  // Estados para gestão de artigos
-  const [isAddingArticle, setIsAddingArticle] = useState(false);
-  const [editingArticle, setEditingArticle] = useState<ProposalArticle | null>(null);
-  const [articleFormData, setArticleFormData] = useState({
-    type: "catalog",
-    catalogArticleId: "",
-    name: "",
-    description: "",
-    group: "",
-    pvp: "",
-    marginPercent: "",
-    marginEuro: "",
-    costPrice: "",
-    quantity: "1"
-  });
-
-  // Mock data de clientes (em produção virá do Supabase)
-  const clients = [
-    { id: "1", name: "TechCorp Solutions" },
-    { id: "2", name: "InnovaTech" },
-    { id: "3", name: "DigitalPro" },
-    { id: "4", name: "StartupXYZ" },
-    { id: "5", name: "Enterprise Corp" }
-  ];
-
-  // Opções de grupos expandidas
-  const articleGroups = [
-    "Serviços",
-    "Pack de horas", 
-    "Marketing",
-    "Sites",
-    "Consultoria",
-    "Desenvolvimento",
-    "Design",
-    "Suporte"
-  ];
-
-  // Opções de estados expandidas
-  const proposalStatuses = [
-    "Rascunho",
-    "Aberta", 
-    "Enviada",
-    "Em Análise",
-    "Aprovada",
-    "Ganha",
-    "Perdida",
-    "Cancelada"
-  ];
-
-  // Mock data de artigos disponíveis
-  const availableArticles = [
-    {
-      id: "1",
-      name: "Desenvolvimento Website",
-      description: "Criação de website corporativo",
-      group: "Sites" as const,
-      pvp: 2500,
-      marginPercent: 60,
-      marginEuro: 1500,
-      costPrice: 1000,
-      commission: 112.50
-    },
-    {
-      id: "2",
-      name: "Campanha Google Ads",
-      description: "Gestão de campanha publicitária",
-      group: "Marketing" as const,
-      pvp: 800,
-      marginPercent: 50,
-      marginEuro: 400,
-      costPrice: 400,
-      commission: 80
-    },
-    {
-      id: "3",
-      name: "Consultoria SEO",
-      description: "Análise e otimização SEO",
-      group: "Consultoria" as const,
-      pvp: 1200,
-      marginPercent: 70,
-      marginEuro: 840,
-      costPrice: 360,
-      commission: 168
+  // Fetch propostas
+  const { data: proposals = [], isLoading } = useQuery({
+    queryKey: ['proposals'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('proposals')
+        .select(`
+          *,
+          client:clients(id, name, email, phone)
+        `)
+        .order('created_at', { ascending: false });
+      
+      if (error) throw error;
+      return data;
     }
-  ];
+  });
 
-  // Funções de cálculo
-  const calculateCommission = (group: string, marginEuro: number) => {
-    const rates = {
-      "Serviços": 0.05,
-      "Pack de horas": 0.10,
-      "Marketing": 0.20,
-      "Sites": 0.075,
-      "Consultoria": 0.15,
-      "Desenvolvimento": 0.08,
-      "Design": 0.12,
-      "Suporte": 0.06
-    };
-    return marginEuro * (rates[group as keyof typeof rates] || 0);
-  };
+  // Fetch clientes
+  const { data: clients = [] } = useQuery({
+    queryKey: ['clients'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('clients')
+        .select('*')
+        .order('name');
+      
+      if (error) throw error;
+      return data;
+    }
+  });
 
-  const calculateFromMarginPercent = (pvp: number, marginPercent: number) => {
-    const marginEuro = (pvp * marginPercent) / 100;
-    const costPrice = pvp - marginEuro;
-    return { marginEuro, costPrice };
-  };
+  // Fetch artigos
+  const { data: articles = [] } = useQuery({
+    queryKey: ['articles'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('articles')
+        .select('*')
+        .order('reference');
+      
+      if (error) throw error;
+      return data;
+    }
+  });
 
-  const calculateFromMarginEuro = (pvp: number, marginEuro: number) => {
-    const marginPercent = (marginEuro / pvp) * 100;
-    const costPrice = pvp - marginEuro;
-    return { marginPercent, costPrice };
-  };
+  // Mutation para criar/atualizar proposta
+  const proposalMutation = useMutation({
+    mutationFn: async (proposal: Proposal) => {
+      if (editingProposal) {
+        const { data, error } = await supabase
+          .from('proposals')
+          .update(proposal)
+          .eq('id', editingProposal.id)
+          .select()
+          .single();
+        if (error) throw error;
+        return data;
+      } else {
+        const { data, error } = await supabase
+          .from('proposals')
+          .insert(proposal)
+          .select()
+          .single();
+        if (error) throw error;
+        return data;
+      }
+    },
+    onSuccess: async (savedProposal) => {
+      // Guardar linhas da proposta
+      if (proposalLines.length > 0) {
+        // Primeiro eliminar linhas existentes se estiver a editar
+        if (editingProposal) {
+          await supabase
+            .from('proposal_lines')
+            .delete()
+            .eq('proposal_id', savedProposal.id);
+        }
+
+        // Inserir novas linhas
+        const linesToInsert = proposalLines.map((line, index) => ({
+          proposal_id: savedProposal.id,
+          article_id: line.article_id,
+          description: line.description,
+          unit: line.unit,
+          quantity: line.quantity,
+          unit_price: line.unit_price,
+          discount_percentage: line.discount_percentage,
+          line_total: line.line_total,
+          sort_order: index
+        }));
+
+        const { error } = await supabase
+          .from('proposal_lines')
+          .insert(linesToInsert);
+        
+        if (error) throw error;
+      }
+
+      queryClient.invalidateQueries({ queryKey: ['proposals'] });
+      toast({
+        title: "Sucesso",
+        description: editingProposal ? "Proposta atualizada!" : "Proposta criada!",
+      });
+      resetForm();
+    },
+    onError: (error) => {
+      console.error('Erro ao guardar proposta:', error);
+      toast({
+        title: "Erro",
+        description: "Erro ao guardar proposta",
+        variant: "destructive",
+      });
+    }
+  });
 
   const resetForm = () => {
-    setFormData({
-      status: "Rascunho",
-      clientId: "",
-      clientName: ""
-    });
+    setShowForm(false);
     setEditingProposal(null);
-    setSelectedProposal(null);
-  };
-
-  const resetArticleForm = () => {
-    setArticleFormData({
-      type: "catalog",
-      catalogArticleId: "",
-      name: "",
-      description: "",
-      group: "",
-      pvp: "",
-      marginPercent: "",
-      marginEuro: "",
-      costPrice: "",
-      quantity: "1"
+    setProposalForm({
+      number: '',
+      status: 'rascunho',
+      proposal_date: new Date().toISOString().split('T')[0],
+      subtotal: 0,
+      discount_percentage: 0,
+      total: 0,
+      commission_percentage: 0
     });
-    setEditingArticle(null);
-    setIsAddingArticle(false);
+    setProposalLines([]);
   };
 
-  const handleInputChange = (field: string, value: string) => {
-    if (field === "clientId") {
-      const client = clients.find(c => c.id === value);
-      setFormData(prev => ({ 
-        ...prev, 
-        [field]: value,
-        clientName: client?.name || ""
-      }));
-    } else {
-      setFormData(prev => ({ ...prev, [field]: value }));
-    }
+  const addProposalLine = () => {
+    setProposalLines([...proposalLines, {
+      description: '',
+      unit: 'un',
+      quantity: 1,
+      unit_price: 0,
+      discount_percentage: 0,
+      line_total: 0
+    }]);
   };
 
-  const handleArticleInputChange = (field: string, value: string) => {
-    setArticleFormData(prev => {
-      const newData = { ...prev, [field]: value };
-
-      if (field === "catalogArticleId" && value) {
-        const article = availableArticles.find(a => a.id === value);
-        if (article) {
-          return {
-            ...newData,
-            name: article.name,
-            description: article.description,
-            group: article.group,
-            pvp: article.pvp.toString(),
-            marginPercent: article.marginPercent.toString(),
-            marginEuro: article.marginEuro.toString(),
-            costPrice: article.costPrice.toString()
-          };
-        }
-      }
-
-      if (field === "pvp" || field === "marginPercent" || field === "marginEuro") {
-        const pvp = parseFloat(field === "pvp" ? value : newData.pvp) || 0;
-        
-        if (field === "marginPercent" && value) {
-          const marginPercent = parseFloat(value);
-          const { marginEuro, costPrice } = calculateFromMarginPercent(pvp, marginPercent);
-          newData.marginEuro = marginEuro.toFixed(2);
-          newData.costPrice = costPrice.toFixed(2);
-        } else if (field === "marginEuro" && value) {
-          const marginEuro = parseFloat(value);
-          const { marginPercent, costPrice } = calculateFromMarginEuro(pvp, marginEuro);
-          newData.marginPercent = marginPercent.toFixed(2);
-          newData.costPrice = costPrice.toFixed(2);
-        }
-      }
-
-      return newData;
-    });
-  };
-
-  const handleCreateNew = () => {
-    const newProposal: Proposal = {
-      id: Date.now().toString(),
-      status: "Rascunho",
-      clientId: "",
-      clientName: "",
-      articles: [],
-      totalValue: 0,
-      totalCommission: 0,
-      createdDate: new Date().toISOString().split('T')[0]
-    };
+  const updateProposalLine = (index: number, field: keyof ProposalLine, value: any) => {
+    const newLines = [...proposalLines];
+    newLines[index] = { ...newLines[index], [field]: value };
     
-    setEditingProposal(newProposal);
-    setFormData({
-      status: "Rascunho",
-      clientId: "",
-      clientName: ""
-    });
-    setIsCreating(true);
-  };
-
-  const handleSubmit = () => {
-    if (!formData.clientId || !formData.status) {
-      toast.error("Preencha os campos obrigatórios!");
-      return;
-    }
-
-    if (!editingProposal) return;
-
-    const proposalData: Proposal = {
-      ...editingProposal,
-      status: formData.status as Proposal["status"],
-      clientId: formData.clientId,
-      clientName: formData.clientName,
-    };
-
-    // Recalcular totais
-    proposalData.totalValue = proposalData.articles.reduce((sum, art) => sum + (art.pvp * art.quantity), 0);
-    proposalData.totalCommission = proposalData.articles.reduce((sum, art) => sum + art.commission, 0);
-
-    const existingIndex = proposals.findIndex(p => p.id === proposalData.id);
-    if (existingIndex >= 0) {
-      setProposals(prev => prev.map(p => p.id === proposalData.id ? proposalData : p));
-      toast.success("Proposta atualizada com sucesso!");
-    } else {
-      setProposals(prev => [...prev, proposalData]);
-      toast.success("Proposta criada com sucesso!");
-    }
-
-    setIsCreating(false);
-    resetForm();
-  };
-
-  const handleSubmitArticle = () => {
-    if (!editingProposal) return;
-
-    if (articleFormData.type === "catalog" && !articleFormData.catalogArticleId) {
-      toast.error("Selecione um artigo do catálogo!");
-      return;
-    }
-
-    if (articleFormData.type === "custom" && (!articleFormData.name || !articleFormData.group || !articleFormData.pvp)) {
-      toast.error("Preencha os campos obrigatórios!");
-      return;
-    }
-
-    const quantity = parseInt(articleFormData.quantity) || 1;
-    const pvp = parseFloat(articleFormData.pvp) || 0;
-    const marginEuro = parseFloat(articleFormData.marginEuro) || 0;
-    const commission = calculateCommission(articleFormData.group, marginEuro) * quantity;
-
-    const newArticle: ProposalArticle = {
-      id: editingArticle?.id || Date.now().toString(),
-      name: articleFormData.name,
-      description: articleFormData.description,
-      group: articleFormData.group as ProposalArticle["group"],
-      pvp,
-      marginPercent: parseFloat(articleFormData.marginPercent) || 0,
-      marginEuro,
-      costPrice: parseFloat(articleFormData.costPrice) || 0,
-      commission,
-      quantity,
-      isFromCatalog: articleFormData.type === "catalog",
-      catalogArticleId: articleFormData.type === "catalog" ? articleFormData.catalogArticleId : undefined
-    };
-
-    const updatedProposal = {
-      ...editingProposal,
-      articles: editingArticle 
-        ? editingProposal.articles.map(a => a.id === editingArticle.id ? newArticle : a)
-        : [...editingProposal.articles, newArticle]
-    };
-
-    updatedProposal.totalValue = updatedProposal.articles.reduce((sum, art) => sum + (art.pvp * art.quantity), 0);
-    updatedProposal.totalCommission = updatedProposal.articles.reduce((sum, art) => sum + art.commission, 0);
-
-    setEditingProposal(updatedProposal);
+    // Recalcular total da linha
+    const line = newLines[index];
+    const subtotal = line.quantity * line.unit_price;
+    const discountAmount = subtotal * (line.discount_percentage / 100);
+    line.line_total = subtotal - discountAmount;
     
-    toast.success(editingArticle ? "Artigo atualizado!" : "Artigo adicionado!");
-    resetArticleForm();
+    setProposalLines(newLines);
+    calculateTotals(newLines);
   };
 
-  const handleEdit = (proposal: Proposal) => {
-    setEditingProposal(proposal);
-    setFormData({
-      status: proposal.status,
-      clientId: proposal.clientId,
-      clientName: proposal.clientName
-    });
-    setIsCreating(true);
+  const removeProposalLine = (index: number) => {
+    const newLines = proposalLines.filter((_, i) => i !== index);
+    setProposalLines(newLines);
+    calculateTotals(newLines);
   };
 
-  const handleEditArticle = (article: ProposalArticle) => {
-    setEditingArticle(article);
-    setArticleFormData({
-      type: article.isFromCatalog ? "catalog" : "custom",
-      catalogArticleId: article.catalogArticleId || "",
-      name: article.name,
-      description: article.description,
-      group: article.group,
-      pvp: article.pvp.toString(),
-      marginPercent: article.marginPercent.toString(),
-      marginEuro: article.marginEuro.toString(),
-      costPrice: article.costPrice.toString(),
-      quantity: article.quantity.toString()
-    });
-    setIsAddingArticle(true);
+  const calculateTotals = (lines: ProposalLine[]) => {
+    const subtotal = lines.reduce((sum, line) => sum + line.line_total, 0);
+    const discountAmount = subtotal * (proposalForm.discount_percentage / 100);
+    const total = subtotal - discountAmount;
+    
+    setProposalForm(prev => ({
+      ...prev,
+      subtotal,
+      total
+    }));
   };
 
-  const handleDelete = (id: string) => {
-    setProposals(prev => prev.filter(p => p.id !== id));
-    toast.success("Proposta eliminada com sucesso!");
+  const selectArticle = (index: number, articleId: string) => {
+    const article = articles.find(a => a.id === articleId);
+    if (article) {
+      updateProposalLine(index, 'article_id', articleId);
+      updateProposalLine(index, 'description', article.description);
+      updateProposalLine(index, 'unit', article.unit);
+      updateProposalLine(index, 'unit_price', article.sale_price);
+    }
   };
 
-  const handleDeleteArticle = (articleId: string) => {
-    if (!editingProposal) return;
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!proposalForm.number || !proposalForm.client_id) {
+      toast({
+        title: "Erro",
+        description: "Número da proposta e cliente são obrigatórios",
+        variant: "destructive",
+      });
+      return;
+    }
 
-    const updatedProposal = {
-      ...editingProposal,
-      articles: editingProposal.articles.filter(a => a.id !== articleId)
-    };
-
-    updatedProposal.totalValue = updatedProposal.articles.reduce((sum, art) => sum + (art.pvp * art.quantity), 0);
-    updatedProposal.totalCommission = updatedProposal.articles.reduce((sum, art) => sum + art.commission, 0);
-
-    setEditingProposal(updatedProposal);
-    toast.success("Artigo removido!");
+    proposalMutation.mutate(proposalForm);
   };
 
-  const handleViewProposal = (proposal: Proposal) => {
-    setSelectedProposal(proposal);
-    setIsArticleDialogOpen(true);
+  const statusColors = {
+    rascunho: "bg-gray-100 text-gray-800",
+    enviada: "bg-blue-100 text-blue-800",
+    aprovada: "bg-green-100 text-green-800",
+    rejeitada: "bg-red-100 text-red-800",
+    expirada: "bg-orange-100 text-orange-800"
   };
 
-  const getStatusColor = (status: string) => {
-    const colors = {
-      "Rascunho": "bg-gray-100 text-gray-800",
-      "Aberta": "bg-blue-100 text-blue-800",
-      "Enviada": "bg-yellow-100 text-yellow-800",
-      "Em Análise": "bg-orange-100 text-orange-800",
-      "Aprovada": "bg-emerald-100 text-emerald-800",
-      "Ganha": "bg-green-100 text-green-800",
-      "Perdida": "bg-red-100 text-red-800",
-      "Cancelada": "bg-slate-100 text-slate-800"
-    };
-    return colors[status as keyof typeof colors] || "bg-gray-100 text-gray-800";
+  const statusLabels = {
+    rascunho: "Rascunho",
+    enviada: "Enviada",
+    aprovada: "Aprovada",
+    rejeitada: "Rejeitada",
+    expirada: "Expirada"
   };
 
-  const getGroupColor = (group: string) => {
-    const colors = {
-      "Serviços": "bg-blue-100 text-blue-800",
-      "Pack de horas": "bg-green-100 text-green-800",
-      "Marketing": "bg-purple-100 text-purple-800",
-      "Sites": "bg-orange-100 text-orange-800",
-      "Consultoria": "bg-indigo-100 text-indigo-800",
-      "Desenvolvimento": "bg-cyan-100 text-cyan-800",
-      "Design": "bg-pink-100 text-pink-800",
-      "Suporte": "bg-amber-100 text-amber-800"
-    };
-    return colors[group as keyof typeof colors] || "bg-gray-100 text-gray-800";
-  };
-
-  return (
-    <div className="space-y-6">
-      <Card className="bg-white shadow-lg">
+  if (showForm) {
+    return (
+      <Card>
         <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle className="flex items-center gap-2">
-                <FileText className="w-5 h-5 text-orange-600" />
-                Gestão de Propostas
-              </CardTitle>
-              <CardDescription>
-                Gerir propostas comerciais com artigos e comissões
-              </CardDescription>
-            </div>
-            {!isCreating && (
-              <Button onClick={handleCreateNew} className="bg-orange-600 hover:bg-orange-700">
-                <Plus className="w-4 h-4 mr-2" />
-                Nova Proposta
-              </Button>
-            )}
-          </div>
+          <CardTitle className="flex items-center justify-between">
+            <span>{editingProposal ? "Editar Proposta" : "Nova Proposta"}</span>
+            <Button variant="outline" onClick={resetForm}>
+              <X className="w-4 h-4 mr-2" />
+              Cancelar
+            </Button>
+          </CardTitle>
         </CardHeader>
         <CardContent>
-          {isCreating && editingProposal && (
-            <div className="mb-6 p-4 border rounded-lg bg-gray-50 space-y-6">
-              <h3 className="text-lg font-semibold">Nova Proposta</h3>
+          <form onSubmit={handleSubmit} className="space-y-6">
+            {/* Cabeçalho da Proposta */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <Label htmlFor="number">Número da Proposta *</Label>
+                <Input
+                  id="number"
+                  value={proposalForm.number}
+                  onChange={(e) => setProposalForm(prev => ({ ...prev, number: e.target.value }))}
+                  placeholder="P2024-001"
+                  required
+                />
+              </div>
               
-              {/* Dados da proposta */}
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="clientId">Cliente *</Label>
-                  <Select value={formData.clientId} onValueChange={(value) => handleInputChange("clientId", value)}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecionar cliente" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {clients.map(client => (
-                        <SelectItem key={client.id} value={client.id}>
-                          {client.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <Label htmlFor="status">Estado *</Label>
-                  <Select value={formData.status} onValueChange={(value) => handleInputChange("status", value)}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecionar estado" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {proposalStatuses.map(status => (
-                        <SelectItem key={status} value={status}>
-                          {status}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+              <div>
+                <Label htmlFor="client">Cliente *</Label>
+                <Select
+                  value={proposalForm.client_id || ""}
+                  onValueChange={(value) => setProposalForm(prev => ({ ...prev, client_id: value }))}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecionar cliente" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {clients.map((client) => (
+                      <SelectItem key={client.id} value={client.id}>
+                        {client.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
 
-              {/* Artigos da proposta */}
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <h4 className="font-semibold">Artigos da Proposta</h4>
-                  {!isAddingArticle && (
-                    <Button onClick={() => setIsAddingArticle(true)} className="bg-blue-600 hover:bg-blue-700">
-                      <Plus className="w-4 h-4 mr-2" />
-                      Adicionar Artigo
-                    </Button>
-                  )}
-                </div>
+              <div>
+                <Label htmlFor="status">Estado</Label>
+                <Select
+                  value={proposalForm.status}
+                  onValueChange={(value: any) => setProposalForm(prev => ({ ...prev, status: value }))}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="rascunho">Rascunho</SelectItem>
+                    <SelectItem value="enviada">Enviada</SelectItem>
+                    <SelectItem value="aprovada">Aprovada</SelectItem>
+                    <SelectItem value="rejeitada">Rejeitada</SelectItem>
+                    <SelectItem value="expirada">Expirada</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
 
-                {/* Formulário de artigo */}
-                {isAddingArticle && (
-                  <div className="border rounded-lg p-4 bg-white space-y-4">
-                    <h5 className="font-medium">{editingArticle ? "Editar Artigo" : "Novo Artigo"}</h5>
-                    
-                    <div>
-                      <Label>Tipo de Artigo</Label>
-                      <Select value={articleFormData.type} onValueChange={(value) => handleArticleInputChange("type", value)}>
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="catalog">Do Catálogo</SelectItem>
-                          <SelectItem value="custom">Linha Avulsa</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <Label htmlFor="group">Grupo</Label>
+                <Select
+                  value={proposalForm.group_name || ""}
+                  onValueChange={(value) => setProposalForm(prev => ({ ...prev, group_name: value }))}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecionar grupo" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Obras Públicas">Obras Públicas</SelectItem>
+                    <SelectItem value="Obras Privadas">Obras Privadas</SelectItem>
+                    <SelectItem value="Manutenção">Manutenção</SelectItem>
+                    <SelectItem value="Consultoria">Consultoria</SelectItem>
+                    <SelectItem value="Equipamentos">Equipamentos</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
 
-                    {articleFormData.type === "catalog" && (
-                      <div>
-                        <Label>Artigo do Catálogo</Label>
-                        <Select value={articleFormData.catalogArticleId} onValueChange={(value) => handleArticleInputChange("catalogArticleId", value)}>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Selecionar artigo" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {availableArticles.map(article => (
-                              <SelectItem key={article.id} value={article.id}>
-                                {article.name} - €{article.pvp}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    )}
+              <div>
+                <Label htmlFor="proposal_date">Data da Proposta</Label>
+                <Input
+                  id="proposal_date"
+                  type="date"
+                  value={proposalForm.proposal_date}
+                  onChange={(e) => setProposalForm(prev => ({ ...prev, proposal_date: e.target.value }))}
+                />
+              </div>
 
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <Label>Nome *</Label>
-                        <Input
-                          value={articleFormData.name}
-                          onChange={(e) => handleArticleInputChange("name", e.target.value)}
-                          disabled={articleFormData.type === "catalog"}
-                        />
-                      </div>
-                      <div>
-                        <Label>Grupo *</Label>
-                        <Select 
-                          value={articleFormData.group} 
-                          onValueChange={(value) => handleArticleInputChange("group", value)}
-                          disabled={articleFormData.type === "catalog"}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Selecionar grupo" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {articleGroups.map(group => (
-                              <SelectItem key={group} value={group}>
-                                {group}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
+              <div>
+                <Label htmlFor="expiry_date">Data de Validade</Label>
+                <Input
+                  id="expiry_date"
+                  type="date"
+                  value={proposalForm.expiry_date || ""}
+                  onChange={(e) => setProposalForm(prev => ({ ...prev, expiry_date: e.target.value }))}
+                />
+              </div>
+            </div>
 
-                    <div>
-                      <Label>Descrição</Label>
-                      <Input
-                        value={articleFormData.description}
-                        onChange={(e) => handleArticleInputChange("description", e.target.value)}
-                        disabled={articleFormData.type === "catalog"}
-                      />
-                    </div>
+            {/* Linhas de Artigos */}
+            <div>
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold">Artigos</h3>
+                <Button type="button" onClick={addProposalLine} variant="outline">
+                  <Plus className="w-4 h-4 mr-2" />
+                  Adicionar Linha
+                </Button>
+              </div>
 
-                    <div className="grid grid-cols-5 gap-4">
-                      <div>
-                        <Label>PVP (€) *</Label>
-                        <Input
-                          type="number"
-                          step="0.01"
-                          value={articleFormData.pvp}
-                          onChange={(e) => handleArticleInputChange("pvp", e.target.value)}
-                          disabled={articleFormData.type === "catalog"}
-                        />
-                      </div>
-                      <div>
-                        <Label>Margem %</Label>
-                        <Input
-                          type="number"
-                          step="0.01"
-                          value={articleFormData.marginPercent}
-                          onChange={(e) => handleArticleInputChange("marginPercent", e.target.value)}
-                          disabled={articleFormData.type === "catalog"}
-                        />
-                      </div>
-                      <div>
-                        <Label>Margem €</Label>
-                        <Input
-                          type="number"
-                          step="0.01"
-                          value={articleFormData.marginEuro}
-                          onChange={(e) => handleArticleInputChange("marginEuro", e.target.value)}
-                          disabled={articleFormData.type === "catalog"}
-                        />
-                      </div>
-                      <div>
-                        <Label>Preço Custo</Label>
-                        <Input
-                          type="number"
-                          step="0.01"
-                          value={articleFormData.costPrice}
-                          readOnly
-                          className="bg-gray-100"
-                        />
-                      </div>
-                      <div>
-                        <Label>Quantidade *</Label>
-                        <Input
-                          type="number"
-                          min="1"
-                          value={articleFormData.quantity}
-                          onChange={(e) => handleArticleInputChange("quantity", e.target.value)}
-                        />
-                      </div>
-                    </div>
-
-                    <div className="flex justify-end gap-2">
-                      <Button variant="outline" onClick={resetArticleForm}>
-                        Cancelar
-                      </Button>
-                      <Button onClick={handleSubmitArticle} className="bg-blue-600 hover:bg-blue-700">
-                        {editingArticle ? "Atualizar" : "Adicionar"}
-                      </Button>
-                    </div>
-                  </div>
-                )}
-
-                {/* Lista de artigos */}
-                {editingProposal.articles.length > 0 && (
+              {proposalLines.length > 0 && (
+                <div className="border rounded-lg overflow-hidden">
                   <Table>
                     <TableHeader>
                       <TableRow>
                         <TableHead>Artigo</TableHead>
-                        <TableHead>Grupo</TableHead>
-                        <TableHead>Qtd</TableHead>
-                        <TableHead>PVP Unit.</TableHead>
+                        <TableHead>Descrição</TableHead>
+                        <TableHead>Unid.</TableHead>
+                        <TableHead>Qtd.</TableHead>
+                        <TableHead>Preço Unit.</TableHead>
+                        <TableHead>Desc. %</TableHead>
                         <TableHead>Total</TableHead>
-                        <TableHead>Comissão</TableHead>
-                        <TableHead>Tipo</TableHead>
-                        <TableHead className="text-right">Ações</TableHead>
+                        <TableHead></TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {editingProposal.articles.map((article) => (
-                        <TableRow key={article.id}>
+                      {proposalLines.map((line, index) => (
+                        <TableRow key={index}>
                           <TableCell>
-                            <div>
-                              <div className="font-medium">{article.name}</div>
-                              <div className="text-sm text-gray-500">{article.description}</div>
-                            </div>
+                            <Select
+                              value={line.article_id || ""}
+                              onValueChange={(value) => selectArticle(index, value)}
+                            >
+                              <SelectTrigger className="w-32">
+                                <SelectValue placeholder="Selecionar" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {articles.map((article) => (
+                                  <SelectItem key={article.id} value={article.id}>
+                                    {article.reference}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
                           </TableCell>
                           <TableCell>
-                            <Badge className={getGroupColor(article.group)}>
-                              {article.group}
-                            </Badge>
+                            <Input
+                              value={line.description}
+                              onChange={(e) => updateProposalLine(index, 'description', e.target.value)}
+                              placeholder="Descrição"
+                            />
                           </TableCell>
-                          <TableCell>{article.quantity}</TableCell>
-                          <TableCell>€{article.pvp.toFixed(2)}</TableCell>
-                          <TableCell>€{(article.pvp * article.quantity).toFixed(2)}</TableCell>
-                          <TableCell>€{article.commission.toFixed(2)}</TableCell>
                           <TableCell>
-                            <Badge variant={article.isFromCatalog ? "default" : "secondary"}>
-                              {article.isFromCatalog ? "Catálogo" : "Avulso"}
-                            </Badge>
+                            <Input
+                              value={line.unit}
+                              onChange={(e) => updateProposalLine(index, 'unit', e.target.value)}
+                              className="w-16"
+                            />
                           </TableCell>
-                          <TableCell className="text-right">
-                            <div className="flex justify-end gap-2">
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => handleEditArticle(article)}
-                              >
-                                <Edit className="w-4 h-4" />
-                              </Button>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => handleDeleteArticle(article.id)}
-                                className="text-red-600 hover:text-red-700"
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </Button>
-                            </div>
+                          <TableCell>
+                            <Input
+                              type="number"
+                              step="0.001"
+                              value={line.quantity}
+                              onChange={(e) => updateProposalLine(index, 'quantity', parseFloat(e.target.value) || 0)}
+                              className="w-20"
+                            />
+                          </TableCell>
+                          <TableCell>
+                            <Input
+                              type="number"
+                              step="0.01"
+                              value={line.unit_price}
+                              onChange={(e) => updateProposalLine(index, 'unit_price', parseFloat(e.target.value) || 0)}
+                              className="w-24"
+                            />
+                          </TableCell>
+                          <TableCell>
+                            <Input
+                              type="number"
+                              step="0.01"
+                              value={line.discount_percentage}
+                              onChange={(e) => updateProposalLine(index, 'discount_percentage', parseFloat(e.target.value) || 0)}
+                              className="w-20"
+                            />
+                          </TableCell>
+                          <TableCell>
+                            €{line.line_total.toFixed(2)}
+                          </TableCell>
+                          <TableCell>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => removeProposalLine(index)}
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
                           </TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
                   </Table>
-                )}
+                </div>
+              )}
+            </div>
 
-                {/* Totais */}
-                {editingProposal.articles.length > 0 && (
-                  <div className="border-t pt-4">
-                    <div className="flex justify-between items-center text-lg font-semibold">
-                      <span>Totais da Proposta:</span>
-                      <div className="space-x-4">
-                        <span>Valor: €{editingProposal.totalValue.toFixed(2)}</span>
-                        <span>Comissão: €{editingProposal.totalCommission.toFixed(2)}</span>
-                      </div>
-                    </div>
-                  </div>
-                )}
+            {/* Totais e Observações */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <Label htmlFor="notes">Observações</Label>
+                <Textarea
+                  id="notes"
+                  value={proposalForm.notes || ""}
+                  onChange={(e) => setProposalForm(prev => ({ ...prev, notes: e.target.value }))}
+                  placeholder="Observações adicionais..."
+                  rows={4}
+                />
               </div>
 
-              <div className="flex justify-end gap-2">
-                <Button variant="outline" onClick={() => { setIsCreating(false); resetForm(); }}>
-                  Cancelar
-                </Button>
-                <Button onClick={handleSubmit} className="bg-orange-600 hover:bg-orange-700">
-                  Guardar Proposta
-                </Button>
+              <div className="space-y-4">
+                <div className="flex justify-between">
+                  <span>Subtotal:</span>
+                  <span>€{proposalForm.subtotal.toFixed(2)}</span>
+                </div>
+                
+                <div className="flex items-center gap-2">
+                  <Label htmlFor="discount">Desconto %:</Label>
+                  <Input
+                    id="discount"
+                    type="number"
+                    step="0.01"
+                    value={proposalForm.discount_percentage}
+                    onChange={(e) => {
+                      const discount = parseFloat(e.target.value) || 0;
+                      setProposalForm(prev => ({ ...prev, discount_percentage: discount }));
+                      calculateTotals(proposalLines);
+                    }}
+                    className="w-24"
+                  />
+                </div>
+
+                <div className="flex justify-between font-bold text-lg">
+                  <span>Total:</span>
+                  <span>€{proposalForm.total.toFixed(2)}</span>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <Label htmlFor="commission">Comissão %:</Label>
+                  <Input
+                    id="commission"
+                    type="number"
+                    step="0.01"
+                    value={proposalForm.commission_percentage}
+                    onChange={(e) => setProposalForm(prev => ({ ...prev, commission_percentage: parseFloat(e.target.value) || 0 }))}
+                    className="w-24"
+                  />
+                </div>
               </div>
             </div>
-          )}
 
+            <div className="flex justify-end gap-2">
+              <Button type="button" variant="outline" onClick={resetForm}>
+                Cancelar
+              </Button>
+              <Button type="submit" disabled={proposalMutation.isPending}>
+                <Save className="w-4 h-4 mr-2" />
+                {proposalMutation.isPending ? "A guardar..." : "Guardar"}
+              </Button>
+            </div>
+          </form>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex items-center justify-between">
+          <div>
+            <CardTitle className="flex items-center gap-2">
+              <FileText className="w-5 h-5" />
+              Gestão de Propostas
+            </CardTitle>
+            <CardDescription>
+              Gerir propostas comerciais e orçamentos
+            </CardDescription>
+          </div>
+          <Button onClick={() => setShowForm(true)}>
+            <Plus className="w-4 h-4 mr-2" />
+            Nova Proposta
+          </Button>
+        </div>
+      </CardHeader>
+      <CardContent>
+        {isLoading ? (
+          <div className="text-center py-8">A carregar propostas...</div>
+        ) : (
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead>Número</TableHead>
                 <TableHead>Cliente</TableHead>
                 <TableHead>Estado</TableHead>
-                <TableHead>Artigos</TableHead>
-                <TableHead>Valor Total</TableHead>
-                <TableHead>Comissão Total</TableHead>
+                <TableHead>Grupo</TableHead>
                 <TableHead>Data</TableHead>
-                <TableHead className="text-right">Ações</TableHead>
+                <TableHead>Total</TableHead>
+                <TableHead>Ações</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {proposals.map((proposal) => (
                 <TableRow key={proposal.id}>
+                  <TableCell className="font-medium">{proposal.number}</TableCell>
+                  <TableCell>{proposal.client?.name || 'N/A'}</TableCell>
                   <TableCell>
-                    <div className="font-medium">{proposal.clientName}</div>
-                  </TableCell>
-                  <TableCell>
-                    <Badge className={getStatusColor(proposal.status)}>
-                      {proposal.status}
+                    <Badge className={statusColors[proposal.status]}>
+                      {statusLabels[proposal.status]}
                     </Badge>
                   </TableCell>
-                  <TableCell>{proposal.articles.length} artigo(s)</TableCell>
-                  <TableCell>€{proposal.totalValue.toFixed(2)}</TableCell>
-                  <TableCell>€{proposal.totalCommission.toFixed(2)}</TableCell>
-                  <TableCell>{new Date(proposal.createdDate).toLocaleDateString('pt-PT')}</TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex justify-end gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleViewProposal(proposal)}
-                      >
+                  <TableCell>{proposal.group_name || 'N/A'}</TableCell>
+                  <TableCell>{new Date(proposal.proposal_date).toLocaleDateString('pt-PT')}</TableCell>
+                  <TableCell>€{proposal.total.toFixed(2)}</TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-2">
+                      <Button variant="ghost" size="sm">
                         <Eye className="w-4 h-4" />
                       </Button>
-                      <Button
-                        variant="outline"
+                      <Button 
+                        variant="ghost" 
                         size="sm"
-                        onClick={() => handleEdit(proposal)}
+                        onClick={() => {
+                          setEditingProposal(proposal);
+                          setProposalForm(proposal);
+                          setShowForm(true);
+                        }}
                       >
                         <Edit className="w-4 h-4" />
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleDelete(proposal.id)}
-                        className="text-red-600 hover:text-red-700"
-                      >
-                        <Trash2 className="w-4 h-4" />
                       </Button>
                     </div>
                   </TableCell>
@@ -807,74 +640,9 @@ const ProposalManagement = () => {
               ))}
             </TableBody>
           </Table>
-        </CardContent>
-      </Card>
-
-      {/* Dialog para visualizar proposta */}
-      <Dialog open={isArticleDialogOpen} onOpenChange={setIsArticleDialogOpen}>
-        <DialogContent className="max-w-4xl">
-          <DialogHeader>
-            <DialogTitle>
-              Proposta - {selectedProposal?.clientName}
-            </DialogTitle>
-            <DialogDescription>
-              Visualizar detalhes da proposta
-            </DialogDescription>
-          </DialogHeader>
-          
-          {selectedProposal && (
-            <div className="space-y-6">
-              <div>
-                <h4 className="font-semibold mb-3">Artigos da Proposta</h4>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Artigo</TableHead>
-                      <TableHead>Grupo</TableHead>
-                      <TableHead>Qtd</TableHead>
-                      <TableHead>PVP Unit.</TableHead>
-                      <TableHead>Total</TableHead>
-                      <TableHead>Comissão</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {selectedProposal.articles.map((article) => (
-                      <TableRow key={article.id}>
-                        <TableCell>
-                          <div>
-                            <div className="font-medium">{article.name}</div>
-                            <div className="text-sm text-gray-500">{article.description}</div>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <Badge className={getGroupColor(article.group)}>
-                            {article.group}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>{article.quantity}</TableCell>
-                        <TableCell>€{article.pvp.toFixed(2)}</TableCell>
-                        <TableCell>€{(article.pvp * article.quantity).toFixed(2)}</TableCell>
-                        <TableCell>€{article.commission.toFixed(2)}</TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-
-              <div className="border-t pt-4">
-                <div className="flex justify-between items-center text-lg font-semibold">
-                  <span>Totais da Proposta:</span>
-                  <div className="space-x-4">
-                    <span>Valor: €{selectedProposal.totalValue.toFixed(2)}</span>
-                    <span>Comissão: €{selectedProposal.totalCommission.toFixed(2)}</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
-    </div>
+        )}
+      </CardContent>
+    </Card>
   );
 };
 
