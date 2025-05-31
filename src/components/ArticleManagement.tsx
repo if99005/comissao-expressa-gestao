@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -22,6 +21,8 @@ interface Article {
   costPrice: number;
   commission: number;
 }
+
+type CreationMode = "pvp" | "cost";
 
 const ArticleManagement = () => {
   const [articles, setArticles] = useState<Article[]>([
@@ -51,6 +52,7 @@ const ArticleManagement = () => {
 
   const [isCreating, setIsCreating] = useState(false);
   const [editingArticle, setEditingArticle] = useState<Article | null>(null);
+  const [creationMode, setCreationMode] = useState<CreationMode>("pvp");
   const [formData, setFormData] = useState({
     name: "",
     description: "",
@@ -68,50 +70,83 @@ const ArticleManagement = () => {
     "Sites": 0.075
   };
 
-  const calculateValues = (field: string, value: string, currentData: any) => {
-    const numValue = parseFloat(value) || 0;
-    const pvp = field === "pvp" ? numValue : parseFloat(currentData.pvp) || 0;
-    
-    let marginPercent = 0;
-    let marginEuro = 0;
-    let costPrice = 0;
+  const calculateFromPVP = (pvp: number, marginPercent: number) => {
+    const marginEuro = (pvp * marginPercent) / 100;
+    const costPrice = pvp - marginEuro;
+    return { marginEuro, costPrice };
+  };
 
-    if (field === "marginPercent") {
-      marginPercent = numValue;
-      marginEuro = (pvp * marginPercent) / 100;
-      costPrice = pvp - marginEuro;
-    } else if (field === "marginEuro") {
-      marginEuro = numValue;
-      marginPercent = pvp > 0 ? (marginEuro / pvp) * 100 : 0;
-      costPrice = pvp - marginEuro;
-    } else if (field === "costPrice") {
-      costPrice = numValue;
-      marginEuro = pvp - costPrice;
-      marginPercent = pvp > 0 ? (marginEuro / pvp) * 100 : 0;
-    } else if (field === "pvp") {
-      const currentMarginPercent = parseFloat(currentData.marginPercent) || 0;
-      marginPercent = currentMarginPercent;
-      marginEuro = (pvp * marginPercent) / 100;
-      costPrice = pvp - marginEuro;
+  const calculateFromCost = (costPrice: number, marginValue: number, isPercentage: boolean) => {
+    let marginEuro: number;
+    let marginPercent: number;
+    let pvp: number;
+
+    if (isPercentage) {
+      marginPercent = marginValue;
+      marginEuro = (costPrice * marginPercent) / 100;
+      pvp = costPrice + marginEuro;
+    } else {
+      marginEuro = marginValue;
+      pvp = costPrice + marginEuro;
+      marginPercent = costPrice > 0 ? (marginEuro / costPrice) * 100 : 0;
     }
 
-    return {
-      marginPercent: marginPercent.toFixed(2),
-      marginEuro: marginEuro.toFixed(2),
-      costPrice: costPrice.toFixed(2)
-    };
+    return { marginEuro, marginPercent, pvp };
   };
 
   const handleInputChange = (field: string, value: string) => {
-    if (field === "pvp" || field === "marginPercent" || field === "marginEuro" || field === "costPrice") {
-      const calculated = calculateValues(field, value, formData);
-      setFormData(prev => ({
-        ...prev,
-        [field]: value,
-        ...calculated
-      }));
+    if (creationMode === "pvp") {
+      if (field === "pvp" || field === "marginPercent") {
+        const pvp = field === "pvp" ? parseFloat(value) || 0 : parseFloat(formData.pvp) || 0;
+        const marginPercent = field === "marginPercent" ? parseFloat(value) || 0 : parseFloat(formData.marginPercent) || 0;
+        
+        if (pvp > 0 && marginPercent > 0) {
+          const { marginEuro, costPrice } = calculateFromPVP(pvp, marginPercent);
+          setFormData(prev => ({
+            ...prev,
+            [field]: value,
+            marginEuro: marginEuro.toFixed(2),
+            costPrice: costPrice.toFixed(2)
+          }));
+        } else {
+          setFormData(prev => ({ ...prev, [field]: value }));
+        }
+      } else {
+        setFormData(prev => ({ ...prev, [field]: value }));
+      }
     } else {
-      setFormData(prev => ({ ...prev, [field]: value }));
+      // Creation mode: cost
+      if (field === "costPrice" || field === "marginPercent" || field === "marginEuro") {
+        const costPrice = field === "costPrice" ? parseFloat(value) || 0 : parseFloat(formData.costPrice) || 0;
+        
+        if (costPrice > 0) {
+          if (field === "marginPercent") {
+            const marginPercent = parseFloat(value) || 0;
+            const { marginEuro, pvp } = calculateFromCost(costPrice, marginPercent, true);
+            setFormData(prev => ({
+              ...prev,
+              [field]: value,
+              marginEuro: marginEuro.toFixed(2),
+              pvp: pvp.toFixed(2)
+            }));
+          } else if (field === "marginEuro") {
+            const marginEuro = parseFloat(value) || 0;
+            const { marginPercent, pvp } = calculateFromCost(costPrice, marginEuro, false);
+            setFormData(prev => ({
+              ...prev,
+              [field]: value,
+              marginPercent: marginPercent.toFixed(2),
+              pvp: pvp.toFixed(2)
+            }));
+          } else {
+            setFormData(prev => ({ ...prev, [field]: value }));
+          }
+        } else {
+          setFormData(prev => ({ ...prev, [field]: value }));
+        }
+      } else {
+        setFormData(prev => ({ ...prev, [field]: value }));
+      }
     }
   };
 
@@ -127,11 +162,22 @@ const ArticleManagement = () => {
     });
     setEditingArticle(null);
     setIsCreating(false);
+    setCreationMode("pvp");
   };
 
   const handleSubmit = () => {
-    if (!formData.name || !formData.group || !formData.pvp) {
+    if (!formData.name || !formData.group) {
       toast.error("Preencha os campos obrigatórios!");
+      return;
+    }
+
+    if (creationMode === "pvp" && !formData.pvp) {
+      toast.error("PVP é obrigatório no modo PVP!");
+      return;
+    }
+
+    if (creationMode === "cost" && !formData.costPrice) {
+      toast.error("Preço de custo é obrigatório no modo Preço de Custo!");
       return;
     }
 
@@ -144,7 +190,7 @@ const ArticleManagement = () => {
       name: formData.name,
       description: formData.description,
       group: group,
-      pvp: parseFloat(formData.pvp),
+      pvp: parseFloat(formData.pvp) || 0,
       marginPercent: parseFloat(formData.marginPercent) || 0,
       marginEuro: marginEuro,
       costPrice: parseFloat(formData.costPrice) || 0,
@@ -173,6 +219,7 @@ const ArticleManagement = () => {
       marginEuro: article.marginEuro.toString(),
       costPrice: article.costPrice.toString()
     });
+    setCreationMode("pvp"); // Default to PVP mode when editing
     setIsCreating(true);
   };
 
@@ -219,8 +266,10 @@ const ArticleManagement = () => {
               <h3 className="text-lg font-semibold mb-4">
                 {editingArticle ? "Editar Artigo" : "Novo Artigo"}
               </h3>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="col-span-2">
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {/* Linha 1: Nome, Modo de Criação, Grupo */}
+                <div>
                   <Label htmlFor="name">Nome *</Label>
                   <Input
                     id="name"
@@ -229,15 +278,22 @@ const ArticleManagement = () => {
                     placeholder="Nome do artigo"
                   />
                 </div>
-                <div className="col-span-2">
-                  <Label htmlFor="description">Descrição</Label>
-                  <Textarea
-                    id="description"
-                    value={formData.description}
-                    onChange={(e) => handleInputChange("description", e.target.value)}
-                    placeholder="Descrição do artigo"
-                  />
-                </div>
+                
+                {!editingArticle && (
+                  <div>
+                    <Label htmlFor="creationMode">Modo de Criação</Label>
+                    <Select value={creationMode} onValueChange={(value: CreationMode) => setCreationMode(value)}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="pvp">A partir do PVP</SelectItem>
+                        <SelectItem value="cost">A partir do Preço de Custo</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+
                 <div>
                   <Label htmlFor="group">Grupo *</Label>
                   <Select value={formData.group} onValueChange={(value) => handleInputChange("group", value)}>
@@ -252,53 +308,125 @@ const ArticleManagement = () => {
                     </SelectContent>
                   </Select>
                 </div>
-                <div>
-                  <Label htmlFor="pvp">PVP (€) *</Label>
-                  <Input
-                    id="pvp"
-                    type="number"
-                    step="0.01"
-                    value={formData.pvp}
-                    onChange={(e) => handleInputChange("pvp", e.target.value)}
-                    placeholder="0.00"
+
+                {/* Linha 2: Descrição (ocupa 3 colunas) */}
+                <div className="md:col-span-2 lg:col-span-3">
+                  <Label htmlFor="description">Descrição</Label>
+                  <Textarea
+                    id="description"
+                    value={formData.description}
+                    onChange={(e) => handleInputChange("description", e.target.value)}
+                    placeholder="Descrição do artigo"
+                    className="h-20"
                   />
                 </div>
-                <div>
-                  <Label htmlFor="marginPercent">Margem %</Label>
-                  <Input
-                    id="marginPercent"
-                    type="number"
-                    step="0.01"
-                    value={formData.marginPercent}
-                    onChange={(e) => handleInputChange("marginPercent", e.target.value)}
-                    placeholder="0.00"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="marginEuro">Margem €</Label>
-                  <Input
-                    id="marginEuro"
-                    type="number"
-                    step="0.01"
-                    value={formData.marginEuro}
-                    onChange={(e) => handleInputChange("marginEuro", e.target.value)}
-                    placeholder="0.00"
-                  />
-                </div>
-                <div className="col-span-2">
-                  <Label htmlFor="costPrice">Preço de Custo (calculado)</Label>
-                  <Input
-                    id="costPrice"
-                    type="number"
-                    step="0.01"
-                    value={formData.costPrice}
-                    onChange={(e) => handleInputChange("costPrice", e.target.value)}
-                    placeholder="0.00"
-                    className="bg-gray-50"
-                  />
-                </div>
+
+                {/* Linha 3: Campos de preços baseados no modo */}
+                {creationMode === "pvp" ? (
+                  <>
+                    <div>
+                      <Label htmlFor="pvp">PVP (€) *</Label>
+                      <Input
+                        id="pvp"
+                        type="number"
+                        step="0.01"
+                        value={formData.pvp}
+                        onChange={(e) => handleInputChange("pvp", e.target.value)}
+                        placeholder="0.00"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="marginPercent">Margem %</Label>
+                      <Input
+                        id="marginPercent"
+                        type="number"
+                        step="0.01"
+                        value={formData.marginPercent}
+                        onChange={(e) => handleInputChange("marginPercent", e.target.value)}
+                        placeholder="0.00"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="marginEuro">Margem € (calculado)</Label>
+                      <Input
+                        id="marginEuro"
+                        type="number"
+                        step="0.01"
+                        value={formData.marginEuro}
+                        readOnly
+                        className="bg-gray-100"
+                      />
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div>
+                      <Label htmlFor="costPrice">Preço de Custo (€) *</Label>
+                      <Input
+                        id="costPrice"
+                        type="number"
+                        step="0.01"
+                        value={formData.costPrice}
+                        onChange={(e) => handleInputChange("costPrice", e.target.value)}
+                        placeholder="0.00"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="marginPercent">Margem %</Label>
+                      <Input
+                        id="marginPercent"
+                        type="number"
+                        step="0.01"
+                        value={formData.marginPercent}
+                        onChange={(e) => handleInputChange("marginPercent", e.target.value)}
+                        placeholder="0.00"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="marginEuro">Margem €</Label>
+                      <Input
+                        id="marginEuro"
+                        type="number"
+                        step="0.01"
+                        value={formData.marginEuro}
+                        onChange={(e) => handleInputChange("marginEuro", e.target.value)}
+                        placeholder="0.00"
+                      />
+                    </div>
+                  </>
+                )}
+
+                {/* Linha 4: Campos calculados */}
+                {creationMode === "cost" && (
+                  <div>
+                    <Label htmlFor="pvp">PVP (€) (calculado)</Label>
+                    <Input
+                      id="pvp"
+                      type="number"
+                      step="0.01"
+                      value={formData.pvp}
+                      readOnly
+                      className="bg-gray-100"
+                    />
+                  </div>
+                )}
+                
+                {creationMode === "pvp" && (
+                  <div>
+                    <Label htmlFor="costPrice">Preço de Custo (€) (calculado)</Label>
+                    <Input
+                      id="costPrice"
+                      type="number"
+                      step="0.01"
+                      value={formData.costPrice}
+                      readOnly
+                      className="bg-gray-100"
+                    />
+                  </div>
+                )}
               </div>
-              <div className="flex justify-end gap-2 mt-4">
+
+              <div className="flex justify-end gap-2 mt-6">
                 <Button variant="outline" onClick={resetForm}>
                   Cancelar
                 </Button>
