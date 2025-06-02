@@ -1,0 +1,247 @@
+
+import { useState } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
+import { Save, X } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import { Proposal, ProposalLine, Client } from "@/types/proposal";
+import { useProposalMutation } from "@/hooks/useProposalData";
+import { ProposalLinesTable } from "./ProposalLinesTable";
+import { calculateLineTotals } from "@/utils/proposalCalculations";
+
+interface ProposalFormProps {
+  editingProposal: Proposal | null;
+  onCancel: () => void;
+  clients: Client[];
+}
+
+export const ProposalForm = ({ editingProposal, onCancel, clients }: ProposalFormProps) => {
+  const [proposalForm, setProposalForm] = useState<Proposal>(
+    editingProposal || {
+      number: '',
+      status: 'rascunho',
+      proposal_date: new Date().toISOString().split('T')[0],
+      subtotal: 0,
+      discount_percentage: 0,
+      total: 0,
+      commission_percentage: 0
+    }
+  );
+  const [proposalLines, setProposalLines] = useState<ProposalLine[]>([]);
+  
+  const { toast } = useToast();
+  const proposalMutation = useProposalMutation();
+
+  const calculateTotals = (lines: ProposalLine[]) => {
+    const { subtotal, total } = calculateLineTotals(lines, proposalForm.discount_percentage);
+    setProposalForm(prev => ({ ...prev, subtotal, total }));
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!proposalForm.number || !proposalForm.client_id) {
+      toast({
+        title: "Erro",
+        description: "Número da proposta e cliente são obrigatórios",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    proposalMutation.mutate({
+      proposal: proposalForm,
+      proposalLines,
+      editingProposal
+    }, {
+      onSuccess: () => {
+        onCancel();
+      }
+    });
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center justify-between">
+          <span>{editingProposal ? "Editar Proposta" : "Nova Proposta"}</span>
+          <Button variant="outline" onClick={onCancel}>
+            <X className="w-4 h-4 mr-2" />
+            Cancelar
+          </Button>
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <form onSubmit={handleSubmit} className="space-y-6">
+          {/* Cabeçalho da Proposta */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+              <Label htmlFor="number">Número da Proposta *</Label>
+              <Input
+                id="number"
+                value={proposalForm.number}
+                onChange={(e) => setProposalForm(prev => ({ ...prev, number: e.target.value }))}
+                placeholder="P2024-001"
+                required
+              />
+            </div>
+            
+            <div>
+              <Label htmlFor="client">Cliente *</Label>
+              <Select
+                value={proposalForm.client_id || ""}
+                onValueChange={(value) => setProposalForm(prev => ({ ...prev, client_id: value }))}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecionar cliente" />
+                </SelectTrigger>
+                <SelectContent>
+                  {clients.map((client) => (
+                    <SelectItem key={client.id} value={client.id}>
+                      {client.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <Label htmlFor="status">Estado</Label>
+              <Select
+                value={proposalForm.status}
+                onValueChange={(value: any) => setProposalForm(prev => ({ ...prev, status: value }))}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="rascunho">Rascunho</SelectItem>
+                  <SelectItem value="enviada">Enviada</SelectItem>
+                  <SelectItem value="aprovada">Aprovada</SelectItem>
+                  <SelectItem value="rejeitada">Rejeitada</SelectItem>
+                  <SelectItem value="expirada">Expirada</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+              <Label htmlFor="group">Grupo</Label>
+              <Select
+                value={proposalForm.group_name || ""}
+                onValueChange={(value) => setProposalForm(prev => ({ ...prev, group_name: value }))}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecionar grupo" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Obras Públicas">Obras Públicas</SelectItem>
+                  <SelectItem value="Obras Privadas">Obras Privadas</SelectItem>
+                  <SelectItem value="Manutenção">Manutenção</SelectItem>
+                  <SelectItem value="Consultoria">Consultoria</SelectItem>
+                  <SelectItem value="Equipamentos">Equipamentos</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <Label htmlFor="proposal_date">Data da Proposta</Label>
+              <Input
+                id="proposal_date"
+                type="date"
+                value={proposalForm.proposal_date}
+                onChange={(e) => setProposalForm(prev => ({ ...prev, proposal_date: e.target.value }))}
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="expiry_date">Data de Validade</Label>
+              <Input
+                id="expiry_date"
+                type="date"
+                value={proposalForm.expiry_date || ""}
+                onChange={(e) => setProposalForm(prev => ({ ...prev, expiry_date: e.target.value }))}
+              />
+            </div>
+          </div>
+
+          {/* Linhas de Artigos */}
+          <ProposalLinesTable 
+            proposalLines={proposalLines}
+            setProposalLines={setProposalLines}
+            onTotalsChange={calculateTotals}
+          />
+
+          {/* Totais e Observações */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <Label htmlFor="notes">Observações</Label>
+              <Textarea
+                id="notes"
+                value={proposalForm.notes || ""}
+                onChange={(e) => setProposalForm(prev => ({ ...prev, notes: e.target.value }))}
+                placeholder="Observações adicionais..."
+                rows={4}
+              />
+            </div>
+
+            <div className="space-y-4">
+              <div className="flex justify-between">
+                <span>Subtotal:</span>
+                <span>€{proposalForm.subtotal.toFixed(2)}</span>
+              </div>
+              
+              <div className="flex items-center gap-2">
+                <Label htmlFor="discount">Desconto %:</Label>
+                <Input
+                  id="discount"
+                  type="number"
+                  step="0.01"
+                  value={proposalForm.discount_percentage}
+                  onChange={(e) => {
+                    const discount = parseFloat(e.target.value) || 0;
+                    setProposalForm(prev => ({ ...prev, discount_percentage: discount }));
+                    calculateTotals(proposalLines);
+                  }}
+                  className="w-24"
+                />
+              </div>
+
+              <div className="flex justify-between font-bold text-lg">
+                <span>Total:</span>
+                <span>€{proposalForm.total.toFixed(2)}</span>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <Label htmlFor="commission">Comissão %:</Label>
+                <Input
+                  id="commission"
+                  type="number"
+                  step="0.01"
+                  value={proposalForm.commission_percentage}
+                  onChange={(e) => setProposalForm(prev => ({ ...prev, commission_percentage: parseFloat(e.target.value) || 0 }))}
+                  className="w-24"
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-2">
+            <Button type="button" variant="outline" onClick={onCancel}>
+              Cancelar
+            </Button>
+            <Button type="submit" disabled={proposalMutation.isPending}>
+              <Save className="w-4 h-4 mr-2" />
+              {proposalMutation.isPending ? "A guardar..." : "Guardar"}
+            </Button>
+          </div>
+        </form>
+      </CardContent>
+    </Card>
+  );
+};

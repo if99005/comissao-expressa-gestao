@@ -78,6 +78,33 @@ export type Database = {
         }
         Relationships: []
       }
+      groups: {
+        Row: {
+          commission_percent: number | null
+          created_at: string
+          description: string | null
+          id: string
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          commission_percent?: number | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          commission_percent?: number | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          name?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       proposal_lines: {
         Row: {
           article_id: string | null
@@ -135,6 +162,30 @@ export type Database = {
           },
         ]
       }
+      proposal_status: {
+        Row: {
+          color: string | null
+          created_at: string
+          id: string
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          color?: string | null
+          created_at?: string
+          id?: string
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          color?: string | null
+          created_at?: string
+          id?: string
+          name?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       proposals: {
         Row: {
           client_id: string | null
@@ -149,7 +200,6 @@ export type Database = {
           notes: string | null
           number: string
           proposal_date: string
-          status: Database["public"]["Enums"]["proposal_status"]
           subtotal: number
           total: number
           updated_at: string
@@ -167,7 +217,6 @@ export type Database = {
           notes?: string | null
           number: string
           proposal_date?: string
-          status?: Database["public"]["Enums"]["proposal_status"]
           subtotal?: number
           total?: number
           updated_at?: string
@@ -185,7 +234,6 @@ export type Database = {
           notes?: string | null
           number?: string
           proposal_date?: string
-          status?: Database["public"]["Enums"]["proposal_status"]
           subtotal?: number
           total?: number
           updated_at?: string
@@ -200,6 +248,33 @@ export type Database = {
           },
         ]
       }
+      templates: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          pages: Json | null
+          type: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+          pages?: Json | null
+          type: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          pages?: Json | null
+          type?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -208,12 +283,7 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
-      proposal_status:
-        | "rascunho"
-        | "enviada"
-        | "aprovada"
-        | "rejeitada"
-        | "expirada"
+      [_ in never]: never
     }
     CompositeTypes: {
       [_ in never]: never
@@ -328,14 +398,6 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {
-      proposal_status: [
-        "rascunho",
-        "enviada",
-        "aprovada",
-        "rejeitada",
-        "expirada",
-      ],
-    },
+    Enums: {},
   },
 } as const
