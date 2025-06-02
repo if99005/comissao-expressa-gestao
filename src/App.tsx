@@ -7,6 +7,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import AuthWrapper from "./components/AuthWrapper";
 import Index from "./pages/Index";
 import CreateTemplate from "./pages/CreateTemplate";
+import EditTemplate from "./pages/EditTemplate";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -21,6 +22,7 @@ const App = () => (
           <Routes>
             <Route path="/" element={<Index />} />
             <Route path="/templates/create" element={<CreateTemplate />} />
+            <Route path="/templates/:id/edit" element={<EditTemplate />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
