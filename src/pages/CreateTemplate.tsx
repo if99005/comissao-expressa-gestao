@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { ArrowLeft, Plus, Upload, GripVertical, Trash2, Eye } from "lucide-react";
 import { toast } from "sonner";
 import { DragDropContext, Droppable, Draggable, DropResult } from "react-beautiful-dnd";
+import { supabase } from "@/integrations/supabase/client";
 
 interface TemplatePage {
   id: string;
@@ -22,6 +22,7 @@ const CreateTemplate = () => {
   const [templateName, setTemplateName] = useState("");
   const [pages, setPages] = useState<TemplatePage[]>([]);
   const [previewPage, setPreviewPage] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
 
   const addNewPage = () => {
     const newPage: TemplatePage = {
@@ -63,7 +64,7 @@ const CreateTemplate = () => {
     setPages(items);
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!templateName.trim()) {
       toast.error("Por favor, insira o nome do template");
       return;
@@ -74,9 +75,33 @@ const CreateTemplate = () => {
       return;
     }
 
-    // Aqui você salvaria no backend/localStorage
-    toast.success("Template criado com sucesso!");
-    navigate("/");
+    setSaving(true);
+    
+    try {
+      const { data, error } = await supabase
+        .from('templates')
+        .insert({
+          name: templateName,
+          type: 'proposal',
+          pages: pages
+        })
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Error saving template:', error);
+        toast.error("Erro ao salvar template");
+        return;
+      }
+
+      toast.success("Template criado com sucesso!");
+      navigate("/");
+    } catch (error) {
+      console.error('Error:', error);
+      toast.error("Erro ao salvar template");
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -289,8 +314,12 @@ const CreateTemplate = () => {
             </Card>
 
             <div className="flex flex-col gap-2">
-              <Button onClick={handleSave} className="w-full bg-indigo-600 hover:bg-indigo-700">
-                Criar Template
+              <Button 
+                onClick={handleSave} 
+                className="w-full bg-indigo-600 hover:bg-indigo-700"
+                disabled={saving}
+              >
+                {saving ? "Salvando..." : "Salvar Template"}
               </Button>
               <Button variant="outline" onClick={() => navigate("/")} className="w-full">
                 Cancelar

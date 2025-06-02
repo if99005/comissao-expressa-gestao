@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,18 +8,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { ArrowLeft, Plus, Upload, GripVertical, Trash2, Eye } from "lucide-react";
 import { toast } from "sonner";
 import { DragDropContext, Droppable, Draggable, DropResult } from "react-beautiful-dnd";
+import { supabase } from "@/integrations/supabase/client";
 
 interface TemplatePage {
   id: string;
   title: string;
   orientation: "horizontal" | "vertical";
   backgroundImage?: string;
-}
-
-interface Template {
-  id: string;
-  name: string;
-  pages: TemplatePage[];
 }
 
 const EditTemplate = () => {
@@ -30,26 +24,39 @@ const EditTemplate = () => {
   const [pages, setPages] = useState<TemplatePage[]>([]);
   const [previewPage, setPreviewPage] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    // Simular carregamento do template existente
-    // Em uma aplicação real, aqui faria uma chamada à API
-    const mockTemplate: Template = {
-      id: id || "1",
-      name: "Proposta Comercial",
-      pages: [
-        { 
-          id: "1", 
-          title: "Página Principal", 
-          orientation: "vertical" 
-        }
-      ]
-    };
-
-    setTemplateName(mockTemplate.name);
-    setPages(mockTemplate.pages);
-    setLoading(false);
+    if (id) {
+      loadTemplate();
+    }
   }, [id]);
+
+  const loadTemplate = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('templates')
+        .select('*')
+        .eq('id', id)
+        .single();
+
+      if (error) {
+        console.error('Error loading template:', error);
+        toast.error("Erro ao carregar template");
+        navigate("/");
+        return;
+      }
+
+      setTemplateName(data.name);
+      setPages(data.pages || []);
+    } catch (error) {
+      console.error('Error:', error);
+      toast.error("Erro ao carregar template");
+      navigate("/");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const addNewPage = () => {
     const newPage: TemplatePage = {
@@ -91,7 +98,7 @@ const EditTemplate = () => {
     setPages(items);
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!templateName.trim()) {
       toast.error("Por favor, insira o nome do template");
       return;
@@ -102,9 +109,31 @@ const EditTemplate = () => {
       return;
     }
 
-    // Aqui você salvaria no backend/localStorage
-    toast.success("Template atualizado com sucesso!");
-    navigate("/");
+    setSaving(true);
+
+    try {
+      const { error } = await supabase
+        .from('templates')
+        .update({
+          name: templateName,
+          pages: pages
+        })
+        .eq('id', id);
+
+      if (error) {
+        console.error('Error updating template:', error);
+        toast.error("Erro ao atualizar template");
+        return;
+      }
+
+      toast.success("Template atualizado com sucesso!");
+      navigate("/");
+    } catch (error) {
+      console.error('Error:', error);
+      toast.error("Erro ao atualizar template");
+    } finally {
+      setSaving(false);
+    }
   };
 
   if (loading) {
@@ -325,8 +354,12 @@ const EditTemplate = () => {
             </Card>
 
             <div className="flex flex-col gap-2">
-              <Button onClick={handleSave} className="w-full bg-indigo-600 hover:bg-indigo-700">
-                Salvar Alterações
+              <Button 
+                onClick={handleSave} 
+                className="w-full bg-indigo-600 hover:bg-indigo-700"
+                disabled={saving}
+              >
+                {saving ? "Salvando..." : "Salvar Alterações"}
               </Button>
               <Button variant="outline" onClick={() => navigate("/")} className="w-full">
                 Cancelar
