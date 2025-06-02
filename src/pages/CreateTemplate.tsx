@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -25,9 +26,20 @@ const CreateTemplate = () => {
   const [saving, setSaving] = useState(false);
 
   const addNewPage = () => {
+    let pageTitle = "Página 1";
+    
+    // Se for a primeira página, criar automaticamente como "Corpo"
+    if (pages.length === 0) {
+      pageTitle = "Corpo";
+    } else {
+      // Para as outras páginas, numerá-las sequencialmente
+      const pageNumber = pages.length; // Será Página 1, Página 2, etc.
+      pageTitle = `Página ${pageNumber}`;
+    }
+
     const newPage: TemplatePage = {
       id: Date.now().toString(),
-      title: `Página ${pages.length + 1}`,
+      title: pageTitle,
       orientation: "vertical"
     };
     setPages(prev => [...prev, newPage]);
@@ -83,7 +95,7 @@ const CreateTemplate = () => {
         .insert({
           name: templateName,
           type: 'proposal',
-          pages: pages
+          pages: pages as any // Cast to any to handle Json type
         })
         .select()
         .single();
@@ -150,7 +162,7 @@ const CreateTemplate = () => {
                   <div>
                     <CardTitle>Páginas do Template</CardTitle>
                     <CardDescription>
-                      Adicione e configure as páginas do seu template
+                      A primeira página será automaticamente chamada "Corpo" onde serão impressos os dados da proposta
                     </CardDescription>
                   </div>
                   <Button onClick={addNewPage} variant="outline">
@@ -188,6 +200,11 @@ const CreateTemplate = () => {
                                         onChange={(e) => updatePage(page.id, 'title', e.target.value)}
                                         placeholder="Título da página"
                                       />
+                                      {index === 0 && (
+                                        <p className="text-xs text-blue-600 mt-1">
+                                          Esta é a página principal onde serão impressos os dados da proposta
+                                        </p>
+                                      )}
                                     </div>
                                     <div>
                                       <Label>Orientação</Label>
@@ -303,6 +320,9 @@ const CreateTemplate = () => {
                             {index + 1}. {page.title} ({page.orientation})
                             {page.backgroundImage && (
                               <span className="text-green-600 ml-2">✓ Com imagem</span>
+                            )}
+                            {index === 0 && (
+                              <span className="text-blue-600 ml-2">• Página principal</span>
                             )}
                           </div>
                         ))}

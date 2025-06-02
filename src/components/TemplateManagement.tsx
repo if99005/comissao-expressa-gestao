@@ -5,15 +5,22 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Edit, Trash2, FileText } from "lucide-react";
+import { Plus, Edit, Trash2, FileText, Eye } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+
+interface TemplatePage {
+  id: string;
+  title: string;
+  orientation: "horizontal" | "vertical";
+  backgroundImage?: string;
+}
 
 interface Template {
   id: string;
   name: string;
   type: string;
-  pages: any[];
+  pages: TemplatePage[];
   created_at: string;
 }
 
@@ -21,6 +28,7 @@ const TemplateManagement = () => {
   const navigate = useNavigate();
   const [templates, setTemplates] = useState<Template[]>([]);
   const [loading, setLoading] = useState(true);
+  const [previewTemplate, setPreviewTemplate] = useState<Template | null>(null);
 
   useEffect(() => {
     fetchTemplates();
@@ -39,7 +47,13 @@ const TemplateManagement = () => {
         return;
       }
 
-      setTemplates(data || []);
+      // Convert the Json type to TemplatePage[]
+      const formattedTemplates = (data || []).map(template => ({
+        ...template,
+        pages: Array.isArray(template.pages) ? template.pages as TemplatePage[] : []
+      }));
+
+      setTemplates(formattedTemplates);
     } catch (error) {
       console.error('Error:', error);
       toast.error("Erro ao carregar templates");
@@ -71,6 +85,10 @@ const TemplateManagement = () => {
 
   const handleCreateNew = () => {
     navigate("/templates/create");
+  };
+
+  const handlePreview = (template: Template) => {
+    setPreviewTemplate(template);
   };
 
   if (loading) {
@@ -139,6 +157,13 @@ const TemplateManagement = () => {
                         <Button
                           variant="outline"
                           size="sm"
+                          onClick={() => handlePreview(template)}
+                        >
+                          <Eye className="w-4 h-4" />
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
                           onClick={() => navigate(`/templates/${template.id}/edit`)}
                         >
                           <Edit className="w-4 h-4" />
@@ -160,6 +185,59 @@ const TemplateManagement = () => {
           )}
         </CardContent>
       </Card>
+
+      {/* Template Preview Modal */}
+      {previewTemplate && (
+        <Card className="bg-white shadow-lg">
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <CardTitle>Pré-visualização: {previewTemplate.name}</CardTitle>
+              <Button variant="outline" onClick={() => setPreviewTemplate(null)}>
+                Fechar
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {previewTemplate.pages.map((page, index) => (
+                <div key={page.id} className="border rounded-lg p-4">
+                  <div className="mb-2">
+                    <Badge variant="secondary">{page.title}</Badge>
+                    <span className="ml-2 text-sm text-gray-500">
+                      ({page.orientation})
+                    </span>
+                  </div>
+                  {page.backgroundImage ? (
+                    <div className={`relative border rounded overflow-hidden ${
+                      page.orientation === 'horizontal' ? 'aspect-[4/3]' : 'aspect-[3/4]'
+                    }`}>
+                      <img
+                        src={page.backgroundImage}
+                        alt={`Página ${index + 1}`}
+                        className="w-full h-full object-cover"
+                      />
+                      <div className="absolute inset-0 bg-black bg-opacity-20 flex items-center justify-center">
+                        <span className="text-white font-semibold bg-black bg-opacity-50 px-2 py-1 rounded text-sm">
+                          {page.title}
+                        </span>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className={`border-2 border-dashed border-gray-300 rounded flex items-center justify-center text-gray-500 ${
+                      page.orientation === 'horizontal' ? 'aspect-[4/3]' : 'aspect-[3/4]'
+                    }`}>
+                      <div className="text-center">
+                        <FileText className="w-8 h-8 mx-auto mb-2" />
+                        <p className="text-sm">{page.title}</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 };
