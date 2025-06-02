@@ -37,30 +37,17 @@ export interface Proposal {
   id?: string;
   number: string;
   client_id?: string;
-  status: 'rascunho' | 'enviada' | 'aprovada' | 'rejeitada' | 'expirada';
   group_name?: string;
   proposal_date: string;
   expiry_date?: string;
   subtotal: number;
   discount_percentage: number;
+  discount_amount: number;
   total: number;
   commission_percentage: number;
+  commission_amount: number;
   notes?: string;
+  created_at?: string;
+  updated_at?: string;
   client?: Client;
 }
-
-export const statusColors = {
-  rascunho: "bg-gray-100 text-gray-800",
-  enviada: "bg-blue-100 text-blue-800",
-  aprovada: "bg-green-100 text-green-800",
-  rejeitada: "bg-red-100 text-red-800",
-  expirada: "bg-orange-100 text-orange-800"
-};
-
-export const statusLabels = {
-  rascunho: "Rascunho",
-  enviada: "Enviada",
-  aprovada: "Aprovada",
-  rejeitada: "Rejeitada",
-  expirada: "Expirada"
-};

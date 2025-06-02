@@ -1,9 +1,8 @@
 
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Eye, Edit } from "lucide-react";
-import { Proposal, statusColors, statusLabels } from "@/types/proposal";
+import { Proposal } from "@/types/proposal";
 
 interface ProposalsTableProps {
   proposals: Proposal[];
@@ -22,7 +21,6 @@ export const ProposalsTable = ({ proposals, onEdit, isLoading }: ProposalsTableP
         <TableRow>
           <TableHead>Número</TableHead>
           <TableHead>Cliente</TableHead>
-          <TableHead>Estado</TableHead>
           <TableHead>Grupo</TableHead>
           <TableHead>Data</TableHead>
           <TableHead>Total</TableHead>
@@ -34,11 +32,6 @@ export const ProposalsTable = ({ proposals, onEdit, isLoading }: ProposalsTableP
           <TableRow key={proposal.id}>
             <TableCell className="font-medium">{proposal.number}</TableCell>
             <TableCell>{proposal.client?.name || 'N/A'}</TableCell>
-            <TableCell>
-              <Badge className={statusColors[proposal.status]}>
-                {statusLabels[proposal.status]}
-              </Badge>
-            </TableCell>
             <TableCell>{proposal.group_name || 'N/A'}</TableCell>
             <TableCell>{new Date(proposal.proposal_date).toLocaleDateString('pt-PT')}</TableCell>
             <TableCell>€{proposal.total.toFixed(2)}</TableCell>

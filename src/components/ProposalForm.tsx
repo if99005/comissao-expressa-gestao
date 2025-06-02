@@ -23,12 +23,13 @@ export const ProposalForm = ({ editingProposal, onCancel, clients }: ProposalFor
   const [proposalForm, setProposalForm] = useState<Proposal>(
     editingProposal || {
       number: '',
-      status: 'rascunho',
       proposal_date: new Date().toISOString().split('T')[0],
       subtotal: 0,
       discount_percentage: 0,
+      discount_amount: 0,
       total: 0,
-      commission_percentage: 0
+      commission_percentage: 0,
+      commission_amount: 0
     }
   );
   const [proposalLines, setProposalLines] = useState<ProposalLine[]>([]);
@@ -38,7 +39,15 @@ export const ProposalForm = ({ editingProposal, onCancel, clients }: ProposalFor
 
   const calculateTotals = (lines: ProposalLine[]) => {
     const { subtotal, total } = calculateLineTotals(lines, proposalForm.discount_percentage);
-    setProposalForm(prev => ({ ...prev, subtotal, total }));
+    const discountAmount = subtotal * (proposalForm.discount_percentage / 100);
+    const commissionAmount = total * (proposalForm.commission_percentage / 100);
+    setProposalForm(prev => ({ 
+      ...prev, 
+      subtotal, 
+      total, 
+      discount_amount: discountAmount,
+      commission_amount: commissionAmount
+    }));
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -110,27 +119,6 @@ export const ProposalForm = ({ editingProposal, onCancel, clients }: ProposalFor
             </div>
 
             <div>
-              <Label htmlFor="status">Estado</Label>
-              <Select
-                value={proposalForm.status}
-                onValueChange={(value: any) => setProposalForm(prev => ({ ...prev, status: value }))}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="rascunho">Rascunho</SelectItem>
-                  <SelectItem value="enviada">Enviada</SelectItem>
-                  <SelectItem value="aprovada">Aprovada</SelectItem>
-                  <SelectItem value="rejeitada">Rejeitada</SelectItem>
-                  <SelectItem value="expirada">Expirada</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div>
               <Label htmlFor="group">Grupo</Label>
               <Select
                 value={proposalForm.group_name || ""}
@@ -148,7 +136,9 @@ export const ProposalForm = ({ editingProposal, onCancel, clients }: ProposalFor
                 </SelectContent>
               </Select>
             </div>
+          </div>
 
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <Label htmlFor="proposal_date">Data da Proposta</Label>
               <Input
@@ -224,7 +214,11 @@ export const ProposalForm = ({ editingProposal, onCancel, clients }: ProposalFor
                   type="number"
                   step="0.01"
                   value={proposalForm.commission_percentage}
-                  onChange={(e) => setProposalForm(prev => ({ ...prev, commission_percentage: parseFloat(e.target.value) || 0 }))}
+                  onChange={(e) => {
+                    const commission = parseFloat(e.target.value) || 0;
+                    setProposalForm(prev => ({ ...prev, commission_percentage: commission }));
+                    calculateTotals(proposalLines);
+                  }}
                   className="w-24"
                 />
               </div>
