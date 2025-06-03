@@ -6,10 +6,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, Plus, Upload, GripVertical, Trash2, Eye } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Plus, FileText, GripVertical, X, Save } from "lucide-react";
 import { toast } from "sonner";
-import { DragDropContext, Droppable, Draggable, DropResult } from "react-beautiful-dnd";
 import { supabase } from "@/integrations/supabase/client";
+import { DragDropContext, Droppable, Draggable } from "react-beautiful-dnd";
 
 interface TemplatePage {
   id: string;
@@ -21,333 +22,243 @@ interface TemplatePage {
 const CreateTemplate = () => {
   const navigate = useNavigate();
   const [templateName, setTemplateName] = useState("");
+  const [templateType, setTemplateType] = useState<string>("proposal");
   const [pages, setPages] = useState<TemplatePage[]>([]);
-  const [previewPage, setPreviewPage] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
-  const addNewPage = () => {
-    let pageTitle = "Página 1";
-    
-    // Se for a primeira página, criar automaticamente como "Corpo"
-    if (pages.length === 0) {
-      pageTitle = "Corpo";
-    } else {
-      // Para as outras páginas, numerá-las sequencialmente
-      const pageNumber = pages.length; // Será Página 1, Página 2, etc.
-      pageTitle = `Página ${pageNumber}`;
-    }
-
+  const addPage = () => {
+    const pageCount = pages.length;
     const newPage: TemplatePage = {
-      id: Date.now().toString(),
-      title: pageTitle,
-      orientation: "vertical"
+      id: crypto.randomUUID(),
+      title: pageCount === 0 ? "Corpo" : `Página ${pageCount}`,
+      orientation: "vertical",
     };
-    setPages(prev => [...prev, newPage]);
+    setPages([...pages, newPage]);
   };
 
-  const updatePage = (pageId: string, field: keyof TemplatePage, value: string) => {
-    setPages(prev => prev.map(page => 
-      page.id === pageId ? { ...page, [field]: value } : page
+  const removePage = (pageId: string) => {
+    setPages(pages.filter(page => page.id !== pageId));
+  };
+
+  const updatePage = (pageId: string, updates: Partial<TemplatePage>) => {
+    setPages(pages.map(page => 
+      page.id === pageId ? { ...page, ...updates } : page
     ));
   };
 
-  const deletePage = (pageId: string) => {
-    setPages(prev => prev.filter(page => page.id !== pageId));
-  };
-
-  const handleImageUpload = (pageId: string, event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        updatePage(pageId, 'backgroundImage', e.target?.result as string);
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-
-  const onDragEnd = (result: DropResult) => {
+  const handleDragEnd = (result: any) => {
     if (!result.destination) return;
 
-    const items = Array.from(pages);
-    const [reorderedItem] = items.splice(result.source.index, 1);
-    items.splice(result.destination.index, 0, reorderedItem);
+    const reorderedPages = Array.from(pages);
+    const [removed] = reorderedPages.splice(result.source.index, 1);
+    reorderedPages.splice(result.destination.index, 0, removed);
 
-    setPages(items);
+    setPages(reorderedPages);
   };
 
   const handleSave = async () => {
     if (!templateName.trim()) {
-      toast.error("Por favor, insira o nome do template");
+      toast.error("Nome do template é obrigatório");
       return;
     }
 
     if (pages.length === 0) {
-      toast.error("Por favor, adicione pelo menos uma página");
+      toast.error("Adicione pelo menos uma página");
       return;
     }
 
     setSaving(true);
     
     try {
+      console.log('Saving template with data:', {
+        name: templateName,
+        type: templateType,
+        pages: pages
+      });
+
       const { data, error } = await supabase
         .from('templates')
         .insert({
           name: templateName,
-          type: 'proposal',
-          pages: pages as any // Cast to any to handle Json type
+          type: templateType,
+          pages: pages
         })
         .select()
         .single();
 
       if (error) {
         console.error('Error saving template:', error);
-        toast.error("Erro ao salvar template");
+        toast.error("Erro ao guardar template: " + error.message);
         return;
       }
 
+      console.log('Template saved successfully:', data);
       toast.success("Template criado com sucesso!");
       navigate("/");
     } catch (error) {
       console.error('Error:', error);
-      toast.error("Erro ao salvar template");
+      toast.error("Erro ao guardar template");
     } finally {
       setSaving(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
-      <div className="container mx-auto p-6">
-        {/* Header */}
-        <div className="mb-6">
-          <Button
-            variant="ghost"
-            onClick={() => navigate("/")}
-            className="mb-4"
-          >
-            <ArrowLeft className="w-4 h-4 mr-2" />
-            Voltar aos Templates
-          </Button>
-          <h1 className="text-3xl font-bold text-gray-800">
-            Criar Novo Template
-          </h1>
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Form Section */}
-          <div className="lg:col-span-2 space-y-6">
-            {/* Template Name */}
-            <Card className="bg-white shadow-lg">
-              <CardHeader>
-                <CardTitle>Informações do Template</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div>
-                  <Label htmlFor="templateName">Nome do Template *</Label>
-                  <Input
-                    id="templateName"
-                    value={templateName}
-                    onChange={(e) => setTemplateName(e.target.value)}
-                    placeholder="Nome do template"
-                  />
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Pages Section */}
-            <Card className="bg-white shadow-lg">
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <CardTitle>Páginas do Template</CardTitle>
-                    <CardDescription>
-                      A primeira página será automaticamente chamada "Corpo" onde serão impressos os dados da proposta
-                    </CardDescription>
-                  </div>
-                  <Button onClick={addNewPage} variant="outline">
-                    <Plus className="w-4 h-4 mr-2" />
-                    Adicionar Página
-                  </Button>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <DragDropContext onDragEnd={onDragEnd}>
-                  <Droppable droppableId="pages">
-                    {(provided) => (
-                      <div {...provided.droppableProps} ref={provided.innerRef} className="space-y-4">
-                        {pages.map((page, index) => (
-                          <Draggable key={page.id} draggableId={page.id} index={index}>
-                            {(provided) => (
-                              <div
-                                ref={provided.innerRef}
-                                {...provided.draggableProps}
-                                className="border rounded-lg p-4 bg-gray-50"
-                              >
-                                <div className="flex items-center gap-4">
-                                  <div
-                                    {...provided.dragHandleProps}
-                                    className="cursor-move text-gray-400 hover:text-gray-600"
-                                  >
-                                    <GripVertical className="w-5 h-5" />
-                                  </div>
-                                  
-                                  <div className="flex-1 grid grid-cols-2 gap-4">
-                                    <div>
-                                      <Label>Título da Página</Label>
-                                      <Input
-                                        value={page.title}
-                                        onChange={(e) => updatePage(page.id, 'title', e.target.value)}
-                                        placeholder="Título da página"
-                                      />
-                                      {index === 0 && (
-                                        <p className="text-xs text-blue-600 mt-1">
-                                          Esta é a página principal onde serão impressos os dados da proposta
-                                        </p>
-                                      )}
-                                    </div>
-                                    <div>
-                                      <Label>Orientação</Label>
-                                      <Select
-                                        value={page.orientation}
-                                        onValueChange={(value) => updatePage(page.id, 'orientation', value)}
-                                      >
-                                        <SelectTrigger>
-                                          <SelectValue />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                          <SelectItem value="horizontal">Horizontal</SelectItem>
-                                          <SelectItem value="vertical">Vertical</SelectItem>
-                                        </SelectContent>
-                                      </Select>
-                                    </div>
-                                  </div>
-
-                                  <div className="flex items-center gap-2">
-                                    <input
-                                      type="file"
-                                      accept="image/*"
-                                      onChange={(e) => handleImageUpload(page.id, e)}
-                                      className="hidden"
-                                      id={`upload-${page.id}`}
-                                    />
-                                    <Button
-                                      variant="outline"
-                                      size="sm"
-                                      onClick={() => document.getElementById(`upload-${page.id}`)?.click()}
-                                    >
-                                      <Upload className="w-4 h-4" />
-                                    </Button>
-                                    <Button
-                                      variant="outline"
-                                      size="sm"
-                                      onClick={() => setPreviewPage(previewPage === page.id ? null : page.id)}
-                                    >
-                                      <Eye className="w-4 h-4" />
-                                    </Button>
-                                    <Button
-                                      variant="outline"
-                                      size="sm"
-                                      onClick={() => deletePage(page.id)}
-                                      className="text-red-600 hover:text-red-700"
-                                    >
-                                      <Trash2 className="w-4 h-4" />
-                                    </Button>
-                                  </div>
-                                </div>
-
-                                {/* Image Preview */}
-                                {previewPage === page.id && page.backgroundImage && (
-                                  <div className="mt-4 p-4 border-t">
-                                    <Label className="block mb-2">Pré-visualização:</Label>
-                                    <div className={`relative border rounded-lg overflow-hidden ${
-                                      page.orientation === 'horizontal' ? 'aspect-[4/3]' : 'aspect-[3/4]'
-                                    } max-w-md`}>
-                                      <img
-                                        src={page.backgroundImage}
-                                        alt={`Background para ${page.title}`}
-                                        className="w-full h-full object-cover"
-                                      />
-                                      <div className="absolute inset-0 bg-black bg-opacity-20 flex items-center justify-center">
-                                        <span className="text-white font-semibold bg-black bg-opacity-50 px-3 py-1 rounded">
-                                          {page.title}
-                                        </span>
-                                      </div>
-                                    </div>
-                                  </div>
-                                )}
-                              </div>
-                            )}
-                          </Draggable>
-                        ))}
-                        {provided.placeholder}
-                      </div>
-                    )}
-                  </Droppable>
-                </DragDropContext>
-
-                {pages.length === 0 && (
-                  <div className="text-center py-8 text-gray-500">
-                    Nenhuma página adicionada ainda. Clique em "Adicionar Página" para começar.
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Summary Section */}
-          <div className="space-y-6">
-            <Card className="bg-white shadow-lg">
-              <CardHeader>
-                <CardTitle>Resumo do Template</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <div>
-                    <Label className="text-sm font-medium text-gray-600">Nome</Label>
-                    <p className="font-medium">{templateName || "Nome não definido"}</p>
-                  </div>
-                  <div>
-                    <Label className="text-sm font-medium text-gray-600">Total de Páginas</Label>
-                    <p className="font-medium">{pages.length}</p>
-                  </div>
-                  {pages.length > 0 && (
-                    <div>
-                      <Label className="text-sm font-medium text-gray-600">Páginas</Label>
-                      <div className="space-y-1">
-                        {pages.map((page, index) => (
-                          <div key={page.id} className="text-sm">
-                            {index + 1}. {page.title} ({page.orientation})
-                            {page.backgroundImage && (
-                              <span className="text-green-600 ml-2">✓ Com imagem</span>
-                            )}
-                            {index === 0 && (
-                              <span className="text-blue-600 ml-2">• Página principal</span>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-
-            <div className="flex flex-col gap-2">
+    <div className="space-y-6">
+      <Card className="bg-white shadow-lg">
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <FileText className="w-5 h-5 text-indigo-600" />
+                Criar Novo Template
+              </CardTitle>
+              <CardDescription>
+                Configure as páginas e layout do seu template
+              </CardDescription>
+            </div>
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={() => navigate("/")}>
+                Cancelar
+              </Button>
               <Button 
                 onClick={handleSave} 
-                className="w-full bg-indigo-600 hover:bg-indigo-700"
                 disabled={saving}
+                className="bg-indigo-600 hover:bg-indigo-700"
               >
-                {saving ? "Salvando..." : "Salvar Template"}
-              </Button>
-              <Button variant="outline" onClick={() => navigate("/")} className="w-full">
-                Cancelar
+                <Save className="w-4 h-4 mr-2" />
+                {saving ? "A guardar..." : "Guardar Template"}
               </Button>
             </div>
           </div>
-        </div>
-      </div>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="templateName">Nome do Template</Label>
+              <Input
+                id="templateName"
+                placeholder="Ex: Template Proposta Padrão"
+                value={templateName}
+                onChange={(e) => setTemplateName(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="templateType">Tipo</Label>
+              <Select value={templateType} onValueChange={setTemplateType}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione o tipo" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="proposal">Proposta</SelectItem>
+                  <SelectItem value="invoice">Fatura</SelectItem>
+                  <SelectItem value="quote">Orçamento</SelectItem>
+                  <SelectItem value="report">Relatório</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-semibold">Páginas do Template</h3>
+              <Button onClick={addPage} variant="outline">
+                <Plus className="w-4 h-4 mr-2" />
+                Adicionar Página
+              </Button>
+            </div>
+
+            {pages.length === 0 ? (
+              <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
+                <FileText className="w-12 h-12 mx-auto text-gray-400 mb-4" />
+                <p className="text-gray-500 mb-4">Nenhuma página adicionada ainda</p>
+                <Button onClick={addPage} variant="outline">
+                  <Plus className="w-4 h-4 mr-2" />
+                  Adicionar Primeira Página
+                </Button>
+              </div>
+            ) : (
+              <DragDropContext onDragEnd={handleDragEnd}>
+                <Droppable droppableId="pages">
+                  {(provided) => (
+                    <div
+                      {...provided.droppableProps}
+                      ref={provided.innerRef}
+                      className="space-y-4"
+                    >
+                      {pages.map((page, index) => (
+                        <Draggable key={page.id} draggableId={page.id} index={index}>
+                          {(provided) => (
+                            <div
+                              ref={provided.innerRef}
+                              {...provided.draggableProps}
+                              className="border rounded-lg p-4 bg-white"
+                            >
+                              <div className="flex items-center gap-4">
+                                <div
+                                  {...provided.dragHandleProps}
+                                  className="text-gray-400 hover:text-gray-600"
+                                >
+                                  <GripVertical className="w-5 h-5" />
+                                </div>
+                                
+                                <div className="flex-1 grid grid-cols-1 md:grid-cols-3 gap-4">
+                                  <div>
+                                    <Label>Título da Página</Label>
+                                    <Input
+                                      value={page.title}
+                                      onChange={(e) => updatePage(page.id, { title: e.target.value })}
+                                      placeholder="Nome da página"
+                                    />
+                                  </div>
+                                  
+                                  <div>
+                                    <Label>Orientação</Label>
+                                    <Select
+                                      value={page.orientation}
+                                      onValueChange={(value: "horizontal" | "vertical") => 
+                                        updatePage(page.id, { orientation: value })
+                                      }
+                                    >
+                                      <SelectTrigger>
+                                        <SelectValue />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        <SelectItem value="vertical">Vertical</SelectItem>
+                                        <SelectItem value="horizontal">Horizontal</SelectItem>
+                                      </SelectContent>
+                                    </Select>
+                                  </div>
+                                  
+                                  <div className="flex items-end">
+                                    <Badge variant="outline">
+                                      {page.orientation === "vertical" ? "A4 Vertical" : "A4 Horizontal"}
+                                    </Badge>
+                                  </div>
+                                </div>
+                                
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => removePage(page.id)}
+                                  className="text-red-600 hover:text-red-700"
+                                >
+                                  <X className="w-4 h-4" />
+                                </Button>
+                              </div>
+                            </div>
+                          )}
+                        </Draggable>
+                      ))}
+                      {provided.placeholder}
+                    </div>
+                  )}
+                </Droppable>
+              </DragDropContext>
+            )}
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 };
