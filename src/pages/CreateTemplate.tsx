@@ -162,7 +162,7 @@ const CreateTemplate = () => {
                   <div>
                     <CardTitle>Páginas do Template</CardTitle>
                     <CardDescription>
-                      A primeira página será automaticamente chamada "Corpo" onde serão impressos os dados da proposta
+                      Arraste as páginas para reordená-las. A primeira página será automaticamente chamada "Corpo" onde serão impressos os dados da proposta
                     </CardDescription>
                   </div>
                   <Button onClick={addNewPage} variant="outline">
@@ -313,7 +313,7 @@ const CreateTemplate = () => {
                   </div>
                   {pages.length > 0 && (
                     <div>
-                      <Label className="text-sm font-medium text-gray-600">Páginas</Label>
+                      <Label className="text-sm font-medium text-gray-600">Páginas (em ordem)</Label>
                       <div className="space-y-1">
                         {pages.map((page, index) => (
                           <div key={page.id} className="text-sm">
