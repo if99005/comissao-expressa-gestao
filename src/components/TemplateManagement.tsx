@@ -47,10 +47,12 @@ const TemplateManagement = () => {
         return;
       }
 
-      // Convert the Json type to TemplatePage[]
+      // Convert the Json type to TemplatePage[] safely
       const formattedTemplates = (data || []).map(template => ({
         ...template,
-        pages: Array.isArray(template.pages) ? template.pages as TemplatePage[] : []
+        pages: Array.isArray(template.pages) 
+          ? (template.pages as unknown as TemplatePage[])
+          : []
       }));
 
       setTemplates(formattedTemplates);

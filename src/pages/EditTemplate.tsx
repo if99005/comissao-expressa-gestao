@@ -50,7 +50,9 @@ const EditTemplate = () => {
 
       setTemplateName(data.name);
       // Safely handle the Json type
-      const pagesData = Array.isArray(data.pages) ? data.pages as TemplatePage[] : [];
+      const pagesData = Array.isArray(data.pages) 
+        ? (data.pages as unknown as TemplatePage[])
+        : [];
       setPages(pagesData);
     } catch (error) {
       console.error('Error:', error);
