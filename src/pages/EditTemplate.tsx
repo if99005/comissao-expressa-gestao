@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -119,7 +120,7 @@ const EditTemplate = () => {
         .update({
           name: templateName,
           type: templateType,
-          pages: pages
+          pages: pages as unknown as any
         })
         .eq('id', id)
         .select()

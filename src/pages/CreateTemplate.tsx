@@ -81,7 +81,7 @@ const CreateTemplate = () => {
         .insert({
           name: templateName,
           type: templateType,
-          pages: pages
+          pages: pages as unknown as any
         })
         .select()
         .single();
