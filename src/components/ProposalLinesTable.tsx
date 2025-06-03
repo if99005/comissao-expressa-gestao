@@ -111,29 +111,54 @@ export const ProposalLinesTable = ({ proposalLines, setProposalLines, onTotalsCh
   const selectArticle = (index: number, articleId: string) => {
     if (articleId === "manual") {
       // Reset to manual entry
-      updateProposalLine(index, 'article_id', null);
-      updateProposalLine(index, 'description', '');
-      updateProposalLine(index, 'unit', 'un');
-      updateProposalLine(index, 'unit_price', 0);
-      updateProposalLine(index, 'cost_price', 0);
-      updateProposalLine(index, 'margin_euro', 0);
-      updateProposalLine(index, 'margin_percentage', 0);
+      const newLines = [...proposalLines];
+      newLines[index] = {
+        ...newLines[index],
+        article_id: null,
+        description: '',
+        unit: 'un',
+        unit_price: 0,
+        cost_price: 0,
+        margin_euro: 0,
+        margin_percentage: 0
+      };
+      setProposalLines(newLines);
+      onTotalsChange(newLines);
       return;
     }
 
     const article = articles.find(a => a.id === articleId);
     if (article) {
-      updateProposalLine(index, 'article_id', articleId);
-      updateProposalLine(index, 'description', article.description);
-      updateProposalLine(index, 'unit', article.unit);
-      updateProposalLine(index, 'unit_price', article.sale_price);
-      updateProposalLine(index, 'cost_price', article.purchase_price);
+      console.log('Selected article:', article);
       
-      // Calculate margin from existing prices
+      const newLines = [...proposalLines];
+      
+      // Calculate margin from article prices
       const marginEuro = article.sale_price - article.purchase_price;
       const marginPercent = article.purchase_price > 0 ? (marginEuro / article.purchase_price) * 100 : 0;
-      updateProposalLine(index, 'margin_euro', marginEuro);
-      updateProposalLine(index, 'margin_percentage', marginPercent);
+      
+      // Update all fields at once
+      newLines[index] = {
+        ...newLines[index],
+        article_id: articleId,
+        description: article.description,
+        unit: article.unit,
+        unit_price: article.sale_price,
+        cost_price: article.purchase_price,
+        margin_euro: marginEuro,
+        margin_percentage: marginPercent
+      };
+      
+      // Recalculate line total
+      const updatedLine = newLines[index];
+      const subtotal = updatedLine.quantity * updatedLine.unit_price;
+      const discountAmount = subtotal * (updatedLine.discount_percentage / 100);
+      updatedLine.line_total = subtotal - discountAmount;
+      
+      console.log('Updated line:', updatedLine);
+      
+      setProposalLines(newLines);
+      onTotalsChange(newLines);
     }
   };
 

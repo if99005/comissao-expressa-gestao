@@ -10,6 +10,7 @@ import { Save, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Proposal, ProposalLine, Client } from "@/types/proposal";
 import { useProposalMutation } from "@/hooks/useProposalData";
+import { useTemplates } from "@/hooks/useTemplates";
 import { ProposalLinesTable } from "./ProposalLinesTable";
 import { calculateLineTotals } from "@/utils/proposalCalculations";
 
@@ -33,9 +34,11 @@ export const ProposalForm = ({ editingProposal, onCancel, clients }: ProposalFor
     }
   );
   const [proposalLines, setProposalLines] = useState<ProposalLine[]>([]);
+  const [selectedTemplate, setSelectedTemplate] = useState<string>("");
   
   const { toast } = useToast();
   const proposalMutation = useProposalMutation();
+  const { data: templates = [] } = useTemplates();
 
   const calculateTotals = (lines: ProposalLine[]) => {
     const { subtotal, total } = calculateLineTotals(lines, proposalForm.discount_percentage);
@@ -87,7 +90,7 @@ export const ProposalForm = ({ editingProposal, onCancel, clients }: ProposalFor
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Cabeçalho da Proposta */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div>
               <Label htmlFor="number">Número da Proposta *</Label>
               <Input
@@ -133,6 +136,26 @@ export const ProposalForm = ({ editingProposal, onCancel, clients }: ProposalFor
                   <SelectItem value="Manutenção">Manutenção</SelectItem>
                   <SelectItem value="Consultoria">Consultoria</SelectItem>
                   <SelectItem value="Equipamentos">Equipamentos</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <Label htmlFor="template">Template</Label>
+              <Select
+                value={selectedTemplate}
+                onValueChange={setSelectedTemplate}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecionar template" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">Nenhum template</SelectItem>
+                  {templates.map((template) => (
+                    <SelectItem key={template.id} value={template.id}>
+                      {template.name}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
