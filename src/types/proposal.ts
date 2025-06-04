@@ -18,6 +18,13 @@ export interface Article {
   group_name?: string;
 }
 
+export interface Template {
+  id: string;
+  name: string;
+  type: string;
+  pages?: any;
+}
+
 export interface ProposalLine {
   id?: string;
   article_id?: string;
@@ -51,4 +58,5 @@ export interface Proposal {
   created_at?: string;
   updated_at?: string;
   client?: Client;
+  template?: Template;
 }
