@@ -6,13 +6,21 @@ export const useTemplates = () => {
   return useQuery({
     queryKey: ['templates'],
     queryFn: async () => {
+      console.log('Fetching templates...');
       const { data, error } = await supabase
         .from('templates')
         .select('*')
         .order('name');
       
-      if (error) throw error;
-      return data;
-    }
+      if (error) {
+        console.error('Templates fetch error:', error);
+        throw error;
+      }
+      
+      console.log('Templates fetched:', data);
+      return data || [];
+    },
+    retry: 1,
+    retryDelay: 1000,
   });
 };

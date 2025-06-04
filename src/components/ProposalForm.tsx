@@ -38,7 +38,9 @@ export const ProposalForm = ({ editingProposal, onCancel, clients }: ProposalFor
   
   const { toast } = useToast();
   const proposalMutation = useProposalMutation();
-  const { data: templates = [] } = useTemplates();
+  const { data: templates = [], isLoading: templatesLoading, error: templatesError } = useTemplates();
+
+  console.log('ProposalForm rendered', { templates, templatesLoading, templatesError });
 
   const calculateTotals = (lines: ProposalLine[]) => {
     const { subtotal, total } = calculateLineTotals(lines, proposalForm.discount_percentage);
@@ -75,6 +77,10 @@ export const ProposalForm = ({ editingProposal, onCancel, clients }: ProposalFor
       }
     });
   };
+
+  if (templatesError) {
+    console.error('Templates error:', templatesError);
+  }
 
   return (
     <Card>
@@ -145,9 +151,10 @@ export const ProposalForm = ({ editingProposal, onCancel, clients }: ProposalFor
               <Select
                 value={selectedTemplate}
                 onValueChange={setSelectedTemplate}
+                disabled={templatesLoading}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Selecionar template" />
+                  <SelectValue placeholder={templatesLoading ? "A carregar..." : "Selecionar template"} />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="">Nenhum template</SelectItem>
