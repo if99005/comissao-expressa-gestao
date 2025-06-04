@@ -34,7 +34,7 @@ export const ProposalForm = ({ editingProposal, onCancel, clients }: ProposalFor
     }
   );
   const [proposalLines, setProposalLines] = useState<ProposalLine[]>([]);
-  const [selectedTemplate, setSelectedTemplate] = useState<string>("");
+  const [selectedTemplate, setSelectedTemplate] = useState<string>("none");
   
   const { toast } = useToast();
   const proposalMutation = useProposalMutation();
@@ -157,7 +157,7 @@ export const ProposalForm = ({ editingProposal, onCancel, clients }: ProposalFor
                   <SelectValue placeholder={templatesLoading ? "A carregar..." : "Selecionar template"} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Nenhum template</SelectItem>
+                  <SelectItem value="none">Nenhum template</SelectItem>
                   {templates.map((template) => (
                     <SelectItem key={template.id} value={template.id}>
                       {template.name}
