@@ -58,5 +58,5 @@ export interface Proposal {
   created_at?: string;
   updated_at?: string;
   client?: Client;
-  template?: Template;
+  template?: Pick<Template, 'id' | 'name'>;
 }

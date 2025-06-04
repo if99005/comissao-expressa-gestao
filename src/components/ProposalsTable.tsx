@@ -2,8 +2,9 @@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Eye, Edit } from "lucide-react";
+import { Eye, Edit, FileDown } from "lucide-react";
 import { Proposal } from "@/types/proposal";
+import { useToast } from "@/hooks/use-toast";
 
 interface ProposalsTableProps {
   proposals: Proposal[];
@@ -12,6 +13,38 @@ interface ProposalsTableProps {
 }
 
 export const ProposalsTable = ({ proposals, onEdit, isLoading }: ProposalsTableProps) => {
+  const { toast } = useToast();
+
+  const handleGeneratePDF = async (proposal: Proposal) => {
+    if (!proposal.template_id) {
+      toast({
+        title: "Erro",
+        description: "Esta proposta não tem um template associado",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      // Aqui será implementada a lógica para gerar o PDF
+      toast({
+        title: "PDF em geração",
+        description: `A gerar PDF da proposta ${proposal.number}...`,
+      });
+      
+      // TODO: Implementar a geração real do PDF com o template
+      console.log('Generating PDF for proposal:', proposal.number, 'with template:', proposal.template_id);
+      
+    } catch (error) {
+      console.error('Error generating PDF:', error);
+      toast({
+        title: "Erro",
+        description: "Erro ao gerar PDF da proposta",
+        variant: "destructive",
+      });
+    }
+  };
+
   if (isLoading) {
     return <div className="text-center py-8">A carregar propostas...</div>;
   }
@@ -55,6 +88,15 @@ export const ProposalsTable = ({ proposals, onEdit, isLoading }: ProposalsTableP
                   onClick={() => onEdit(proposal)}
                 >
                   <Edit className="w-4 h-4" />
+                </Button>
+                <Button 
+                  variant="ghost" 
+                  size="sm"
+                  onClick={() => handleGeneratePDF(proposal)}
+                  disabled={!proposal.template_id}
+                  title={!proposal.template_id ? "Sem template associado" : "Gerar PDF"}
+                >
+                  <FileDown className="w-4 h-4" />
                 </Button>
               </div>
             </TableCell>
