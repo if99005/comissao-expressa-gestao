@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { Save, X } from "lucide-react";
+import { Save, X, FileDown } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Proposal, ProposalLine, Client } from "@/types/proposal";
 import { useProposalMutation } from "@/hooks/useProposalData";
@@ -56,6 +56,46 @@ export const ProposalForm = ({ editingProposal, onCancel, clients }: ProposalFor
       template_id: selectedTemplate || undefined 
     }));
   }, [selectedTemplate]);
+
+  const handleGeneratePDF = async () => {
+    if (!selectedTemplate) {
+      toast({
+        title: "Erro",
+        description: "Selecione um template antes de gerar o PDF",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!proposalForm.number) {
+      toast({
+        title: "Erro", 
+        description: "Número da proposta é obrigatório para gerar PDF",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      toast({
+        title: "PDF em geração",
+        description: `A gerar PDF da proposta ${proposalForm.number}...`,
+      });
+      
+      // TODO: Implementar a geração real do PDF com o template
+      console.log('Generating PDF for proposal:', proposalForm.number, 'with template:', selectedTemplate);
+      console.log('Proposal data:', proposalForm);
+      console.log('Proposal lines:', proposalLines);
+      
+    } catch (error) {
+      console.error('Error generating PDF:', error);
+      toast({
+        title: "Erro",
+        description: "Erro ao gerar PDF da proposta",
+        variant: "destructive",
+      });
+    }
+  };
 
   const calculateTotals = (lines: ProposalLine[]) => {
     const { subtotal, total } = calculateLineTotals(lines, proposalForm.discount_percentage);
@@ -111,10 +151,21 @@ export const ProposalForm = ({ editingProposal, onCancel, clients }: ProposalFor
       <CardHeader>
         <CardTitle className="flex items-center justify-between">
           <span>{editingProposal ? "Editar Proposta" : "Nova Proposta"}</span>
-          <Button variant="outline" onClick={onCancel}>
-            <X className="w-4 h-4 mr-2" />
-            Cancelar
-          </Button>
+          <div className="flex gap-2">
+            <Button 
+              variant="outline" 
+              onClick={handleGeneratePDF}
+              disabled={!selectedTemplate || !proposalForm.number}
+              title={!selectedTemplate ? "Selecione um template" : !proposalForm.number ? "Insira o número da proposta" : "Gerar PDF"}
+            >
+              <FileDown className="w-4 h-4 mr-2" />
+              Gerar PDF
+            </Button>
+            <Button variant="outline" onClick={onCancel}>
+              <X className="w-4 h-4 mr-2" />
+              Cancelar
+            </Button>
+          </div>
         </CardTitle>
       </CardHeader>
       <CardContent>
