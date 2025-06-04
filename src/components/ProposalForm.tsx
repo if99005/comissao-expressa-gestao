@@ -1,5 +1,4 @@
-
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -34,13 +33,29 @@ export const ProposalForm = ({ editingProposal, onCancel, clients }: ProposalFor
     }
   );
   const [proposalLines, setProposalLines] = useState<ProposalLine[]>([]);
-  const [selectedTemplate, setSelectedTemplate] = useState<string>("none");
+  const [selectedTemplate, setSelectedTemplate] = useState<string>(
+    editingProposal?.template_id || ""
+  );
   
   const { toast } = useToast();
   const proposalMutation = useProposalMutation();
   const { data: templates = [], isLoading: templatesLoading, error: templatesError } = useTemplates();
 
-  console.log('ProposalForm rendered', { templates, templatesLoading, templatesError });
+  console.log('ProposalForm rendered', { 
+    templates, 
+    templatesLoading, 
+    templatesError,
+    selectedTemplate,
+    editingProposal: editingProposal?.template_id 
+  });
+
+  // Atualizar o template_id no form quando o template selecionado mudar
+  useEffect(() => {
+    setProposalForm(prev => ({ 
+      ...prev, 
+      template_id: selectedTemplate || undefined 
+    }));
+  }, [selectedTemplate]);
 
   const calculateTotals = (lines: ProposalLine[]) => {
     const { subtotal, total } = calculateLineTotals(lines, proposalForm.discount_percentage);
@@ -62,6 +77,15 @@ export const ProposalForm = ({ editingProposal, onCancel, clients }: ProposalFor
       toast({
         title: "Erro",
         description: "Número da proposta e cliente são obrigatórios",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!selectedTemplate) {
+      toast({
+        title: "Erro",
+        description: "A seleção do template é obrigatória",
         variant: "destructive",
       });
       return;
@@ -147,17 +171,17 @@ export const ProposalForm = ({ editingProposal, onCancel, clients }: ProposalFor
             </div>
 
             <div>
-              <Label htmlFor="template">Template</Label>
+              <Label htmlFor="template">Template *</Label>
               <Select
                 value={selectedTemplate}
                 onValueChange={setSelectedTemplate}
                 disabled={templatesLoading}
+                required
               >
                 <SelectTrigger>
                   <SelectValue placeholder={templatesLoading ? "A carregar..." : "Selecionar template"} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="none">Nenhum template</SelectItem>
                   {templates.map((template) => (
                     <SelectItem key={template.id} value={template.id}>
                       {template.name}
@@ -165,6 +189,11 @@ export const ProposalForm = ({ editingProposal, onCancel, clients }: ProposalFor
                   ))}
                 </SelectContent>
               </Select>
+              {!templatesLoading && templates.length === 0 && (
+                <p className="text-sm text-muted-foreground mt-1">
+                  Nenhum template disponível. Crie um template primeiro.
+                </p>
+              )}
             </div>
           </div>
 

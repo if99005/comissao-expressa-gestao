@@ -12,7 +12,8 @@ export const useProposals = () => {
         .from('proposals')
         .select(`
           *,
-          client:clients(id, name, email, phone, nif, address)
+          client:clients(id, name, email, phone, nif, address),
+          template:templates(id, name)
         `)
         .order('created_at', { ascending: false });
       

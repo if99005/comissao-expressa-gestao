@@ -201,6 +201,7 @@ export type Database = {
           number: string
           proposal_date: string
           subtotal: number
+          template_id: string | null
           total: number
           updated_at: string
         }
@@ -218,6 +219,7 @@ export type Database = {
           number: string
           proposal_date?: string
           subtotal?: number
+          template_id?: string | null
           total?: number
           updated_at?: string
         }
@@ -235,6 +237,7 @@ export type Database = {
           number?: string
           proposal_date?: string
           subtotal?: number
+          template_id?: string | null
           total?: number
           updated_at?: string
         }
@@ -244,6 +247,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proposals_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "templates"
             referencedColumns: ["id"]
           },
         ]

@@ -1,6 +1,7 @@
 
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Eye, Edit } from "lucide-react";
 import { Proposal } from "@/types/proposal";
 
@@ -22,6 +23,7 @@ export const ProposalsTable = ({ proposals, onEdit, isLoading }: ProposalsTableP
           <TableHead>Número</TableHead>
           <TableHead>Cliente</TableHead>
           <TableHead>Grupo</TableHead>
+          <TableHead>Template</TableHead>
           <TableHead>Data</TableHead>
           <TableHead>Total</TableHead>
           <TableHead>Ações</TableHead>
@@ -33,6 +35,13 @@ export const ProposalsTable = ({ proposals, onEdit, isLoading }: ProposalsTableP
             <TableCell className="font-medium">{proposal.number}</TableCell>
             <TableCell>{proposal.client?.name || 'N/A'}</TableCell>
             <TableCell>{proposal.group_name || 'N/A'}</TableCell>
+            <TableCell>
+              {proposal.template ? (
+                <Badge variant="outline">{proposal.template.name}</Badge>
+              ) : (
+                <span className="text-muted-foreground">Sem template</span>
+              )}
+            </TableCell>
             <TableCell>{new Date(proposal.proposal_date).toLocaleDateString('pt-PT')}</TableCell>
             <TableCell>€{proposal.total.toFixed(2)}</TableCell>
             <TableCell>

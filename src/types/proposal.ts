@@ -38,6 +38,7 @@ export interface Proposal {
   number: string;
   client_id?: string;
   group_name?: string;
+  template_id?: string;
   proposal_date: string;
   expiry_date?: string;
   subtotal: number;
